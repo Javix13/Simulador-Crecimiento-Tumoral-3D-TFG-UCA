@@ -26,7 +26,7 @@ struct Cell {
 int N_THREADS = 10; //por defecto
 const int nDays = 120;
 const int nSteps = 24 * nDays;
-const int min_cells = 1000000,max_cells=3000000;
+const int min_cells = 0,max_cells=0;
 const int gridSize = 500;
 //crear pools de threads
 std::vector<std::thread> threads;
@@ -355,15 +355,10 @@ void parallel_simulation(int thread_id, int start_index,int end_index){
     std::chrono::time_point<std::chrono::system_clock> start, end;
     start = std::chrono::system_clock::now();
     std::chrono::duration<double> elapsed_seconds;
-    for (int step = 0; step < nSteps; ++step) {
+    for (int step = 1; step <= nSteps; ++step) {
         updateState(thread_id, start_index, end_index,generator,distribution);
         barrier->arrive_and_wait();
-        if(cellsAlive > max_cells){
-            break;
-        }
         if(thread_id == 0 && step % 24 == 0){
-            end = std::chrono::system_clock::now();
-            //countCellsInGrid();
             end = std::chrono::system_clock::now();
             elapsed_seconds= end-start;
             auto elapsed = elapsed_seconds.count();
@@ -379,15 +374,6 @@ void parallel_simulation(int thread_id, int start_index,int end_index){
         threadCells[thread_id]=threadTempCells[thread_id];
         threadTempCells[thread_id].clear();
         barrier->arrive_and_wait();
-    }
-    if(thread_id == 0){
-        elapsed_seconds = std::chrono::system_clock::now()-start;
-        auto elapsed = elapsed_seconds.count();
-        ElapsedTime += elapsed;
-        
-        std::cout << "Day: " << nDays << "\n";
-        std::cout << "cellsAlive: " << cellsAlive << "\n";
-        std::cout << "Elapsed time: " << elapsed_seconds.count() << "s\n";
     }
 
     
@@ -409,7 +395,7 @@ void verifyCellCount() {
 
 
 void appendSimulationData() {
-    std::ofstream file("simdata" + std::to_string(N_THREADS) + "threads"+std::to_string(nDays)+"days.txt", std::ios::app);
+    std::ofstream file("simdata" + std::to_string(N_THREADS) + "threads"+std::to_string(gridSize)+"grid"+std::to_string(nDays)+"days.txt", std::ios::app);
     if (file.is_open()) {
         file << cellsAlive << ":" << ElapsedTime << "\n";
         file.close();
@@ -467,9 +453,8 @@ int main(int argc, char* argv[]) {
     std::cout << "nonStemcellsAlive: " << nonStemcellsAlive << "\n";
     std::cout << "cellsAlive: " << cellsAlive << "\n";
     std::cout << "Elapsed time: " << ElapsedTime << "s\n";
-    verifyCellCount();
-    countCellsInGrid();
     std::cout<<"Number of threads: "<<N_THREADS<<std::endl;
+    countCellsInGrid();
     delete barrier;
     if((min_cells!=0 && cellsAlive<min_cells) || (max_cells!=0 && cellsAlive>max_cells)){
         std::cout<<"Simulation discarded, cells alive: "<<cellsAlive<<std::endl;

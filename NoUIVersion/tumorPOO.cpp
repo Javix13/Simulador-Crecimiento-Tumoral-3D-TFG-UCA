@@ -21,17 +21,15 @@ struct Cell {
 // Variables globales
 const int nDays = 120;
 const int nSteps = 24 * nDays;
-const int min_cells = 1000000,max_cells=5000000;
+const int min_cells = 0,max_cells=0;
 const int gridSize = 500;
 bool grid[gridSize][gridSize][gridSize] = {{{false}}};
 std::vector<Cell> cells;
 std::vector<Cell> tempCells;
-std::vector<double> timestamps;
 std::vector<int> cellsAliveByDay;
 int stemcellsAlive = 0;
 int nonStemcellsAlive = 0;
 int cellsAlive = 0;
-std::map<int, int> emptyNeighboursHist;
 double ElapsedTime = 0;
 
 // Parámetros de simulación
@@ -165,13 +163,12 @@ void simulate() {
     std::chrono::duration<double> elapsed_seconds;
     start = std::chrono::system_clock::now();
     
-        for (int step = 0; step < nSteps; ++step) {
+        for (int step = 1; step <= nSteps; ++step) {
             updateState();
             if(step % 24 == 0){
                 end = std::chrono::system_clock::now();
                 elapsed_seconds = end - start;
                 double elapsed= elapsed_seconds.count();
-                timestamps.push_back(elapsed);
                 cellsAliveByDay.push_back(cellsAlive);
                 ElapsedTime += elapsed;
                 start = std::chrono::system_clock::now();
@@ -185,20 +182,10 @@ void simulate() {
             tempCells.clear();
             
         }
-        elapsed_seconds = std::chrono::system_clock::now() - start;
-        double elapsed = elapsed_seconds.count();
-        timestamps.push_back(elapsed);
-        cellsAliveByDay.push_back(cellsAlive);
-        std::cout << "Day: " << nDays << "\n";
-        std::cout << "stemcellsAlive: " << stemcellsAlive << "\n";
-        std::cout << "nonStemcellsAlive: " << nonStemcellsAlive << "\n";
-        std::cout << "cellsAlive: " << cellsAlive << "\n";
-        std::cout << "Elapsed time: " << elapsed << "s\n";
-        ElapsedTime += elapsed;
         std::cout << "Total elapsed time: " << ElapsedTime << "s\n";
 }
 void appendSimulationData() {
-    std::ofstream file("simdata1threads"+std::to_string(nDays)+"days.txt", std::ios::app);
+    std::ofstream file("simdata1threads"+std::to_string(gridSize)+"grid"+std::to_string(nDays)+"days.txt", std::ios::app);
     if (file.is_open()) {
         file << cellsAlive << ":" << ElapsedTime << "\n";
         file.close();
@@ -234,7 +221,7 @@ int main() {
     simulate();
     if((min_cells!=0 && cellsAlive<min_cells) || (max_cells!=0 && cellsAlive>max_cells)){
         std::cout<<"Simulation discarded, cells alive: "<<cellsAlive<<std::endl;
-        return 1;
+        return 0;
     }
     countCellsInGrid();
     appendSimulationData();
