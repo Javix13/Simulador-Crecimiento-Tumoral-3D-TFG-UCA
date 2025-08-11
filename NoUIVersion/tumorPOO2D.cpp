@@ -10,20 +10,20 @@
 
 // Clase para representar una célula
 struct Cell {
-    int x, y, z;
+    int x, y;
     bool isStemCell;
     int ro;
 
-    Cell(int x, int y, int z, bool isStemCell, int ro)
-        : x(x), y(y), z(z), isStemCell(isStemCell), ro(ro) {}
+    Cell(int x, int y, bool isStemCell, int ro)
+        : x(x), y(y), isStemCell(isStemCell), ro(ro) {}
 };
 
 // Variables globales
-const int nDays = 120;
+const int nDays = 50;
 const int nSteps = 24 * nDays;
 const int min_cells = 0,max_cells=0;
-const int gridSize = 500;
-bool grid[gridSize][gridSize][gridSize] = {{{false}}};
+const int gridSize = 750;
+bool grid[gridSize][gridSize]= {{{false}}};
 std::vector<Cell> cells;
 std::vector<Cell> tempCells;
 std::vector<int> cellsAliveByDay;
@@ -33,7 +33,7 @@ int cellsAlive = 0;
 double ElapsedTime = 0;
 
 // Parámetros de simulación
-const double pd = 1.0 / 24.0 * 1.30;
+const double pd = 1.0 / 24.0;
 const double pm = 10.0 / 24.0;
 const double ps = 0.1;
 const int rhomax = 10;
@@ -43,19 +43,16 @@ std::uniform_real_distribution<double> distribution(0.0, 1.0);
 
 
 // Función para obtener vecinos vacíos
-std::vector<std::array<int, 3>> getEmptyNeighbors(int i, int j, int k) {
-    std::vector<std::array<int, 3>> neighbors;
+std::vector<std::array<int, 2>> getEmptyNeighbors(int i, int j) {
+    std::vector<std::array<int, 2>> neighbors;
 
     for (int x = -1; x <= 1; ++x) {
         for (int y = -1; y <= 1; ++y) {
-            for (int z = -1; z <= 1; ++z) {
-                if (x == 0 && y == 0 && z == 0) continue;
-
-                int ni = i + x, nj = j + y, nk = k + z;
-                if (ni >= 0 && ni < gridSize && nj >= 0 && nj < gridSize && nk >= 0 && nk < gridSize && !grid[ni][nj][nk]) {
-                    neighbors.push_back({ni, nj, nk});
+                if (x == 0 && y == 0) continue;
+                int ni = i + x, nj = j + y;
+                if (ni >= 0 && ni < gridSize && nj >= 0 && nj < gridSize && !grid[ni][nj]) {
+                    neighbors.push_back({ni, nj});
                 }
-            }
         }
     }
     return neighbors;
@@ -63,72 +60,72 @@ std::vector<std::array<int, 3>> getEmptyNeighbors(int i, int j, int k) {
 
 // Función para actualizar células madre
 void updateStemCells(Cell cell) {
-    double prRandom = distribution(generator);
-    auto neighbors = getEmptyNeighbors(cell.x, cell.y, cell.z);
+    auto neighbors = getEmptyNeighbors(cell.x, cell.y);
 
     if (!neighbors.empty()) {
-        if (prRandom < pd) {
-            double psRandom = distribution(generator);
+        double fate = distribution(generator);
+        if (fate < pd) {
+            fate = distribution(generator);
             auto position = neighbors[rand() % neighbors.size()];
 
-            if (psRandom < ps) {
-                grid[position[0]][position[1]][position[2]] = true;
-                tempCells.emplace_back(Cell(position[0], position[1], position[2], true, rhomax));
-                tempCells.emplace_back(Cell(cell.x, cell.y, cell.z, true, cell.ro));
+            if (fate <= ps) {//division simetrica
+                grid[position[0]][position[1]] = true;
+                tempCells.emplace_back(Cell(position[0], position[1], true, rhomax));
+                tempCells.emplace_back(Cell(cell.x, cell.y, true, cell.ro));
                 ++stemcellsAlive;
                 ++cellsAlive;
-            } else {
-                grid[position[0]][position[1]][position[2]] = true;
-                tempCells.emplace_back(Cell(position[0], position[1], position[2], false, rhomax));
-                tempCells.emplace_back(Cell(cell.x, cell.y, cell.z, true, cell.ro));
+            } else { //division asimetrica
+                grid[position[0]][position[1]] = true;
+                tempCells.emplace_back(Cell(position[0],position[1], false, rhomax));
+                tempCells.emplace_back(Cell(cell.x, cell.y, true, cell.ro));
                 ++nonStemcellsAlive;
                 ++cellsAlive;
             }
-        } else if (prRandom < pm) {
+        } else if (fate < pm) { //migracion
             auto newCoor = neighbors[rand() % neighbors.size()];
-            grid[newCoor[0]][newCoor[1]][newCoor[2]] = grid[cell.x][cell.y][cell.z];
-            grid[cell.x][cell.y][cell.z] = false;
-            tempCells.emplace_back(Cell(newCoor[0], newCoor[1], newCoor[2], true, rhomax));
-        } else {
+            grid[newCoor[0]][newCoor[1]] = grid[cell.x][cell.y];
+            grid[cell.x][cell.y]= false;
+            tempCells.emplace_back(Cell(newCoor[0], newCoor[1], true, rhomax));
+        } else { //nada
             tempCells.emplace_back(cell);
         }
-    } else {
+    } else { //nada
         tempCells.emplace_back(cell);
     }
 }
 
 // Función para actualizar células no madre
 void updateNonStemCells(Cell cell) {
-    double r = distribution(generator);
-    if (r < alpha) {
-        grid[cell.x][cell.y][cell.z] = false;
+    double fate = distribution(generator);
+    if (fate < alpha) {
+        grid[cell.x][cell.y]= false;
         --nonStemcellsAlive;
         --cellsAlive;
         return;
     }
 
-    auto neighbors = getEmptyNeighbors(cell.x, cell.y, cell.z);
+    auto neighbors = getEmptyNeighbors(cell.x, cell.y);
 
     if (!neighbors.empty()) {
-        double prRandom = distribution(generator);
+        fate = distribution(generator);
 
-        if (prRandom < pd && cell.ro > 0) {
+        if (fate < pd && cell.ro > 0) {
             --cell.ro;
             auto newCellPosition = neighbors[rand() % neighbors.size()];
-            grid[newCellPosition[0]][newCellPosition[1]][newCellPosition[2]] = true;
+            grid[newCellPosition[0]][newCellPosition[1]] = true;
             tempCells.emplace_back(cell);
-            tempCells.emplace_back(Cell(newCellPosition[0], newCellPosition[1], newCellPosition[2], false, cell.ro));
+            tempCells.emplace_back(Cell(newCellPosition[0], newCellPosition[1], false, cell.ro));
             ++nonStemcellsAlive;
             ++cellsAlive;
         } else if (cell.ro == 0) {
-            grid[cell.x][cell.y][cell.z] = false;
+            grid[cell.x][cell.y] = false;
             --nonStemcellsAlive;
             --cellsAlive;
-        } else if (prRandom < pm) {
+        } else if (fate < pm) {
             auto newCoor = neighbors[rand() % neighbors.size()];
-            grid[newCoor[0]][newCoor[1]][newCoor[2]] = grid[cell.x][cell.y][cell.z];
-            grid[cell.x][cell.y][cell.z] = false;
-            tempCells.emplace_back(Cell(newCoor[0], newCoor[1], newCoor[2], false, cell.ro));
+            grid[newCoor[0]][newCoor[1]] = grid[cell.x][cell.y];
+            grid[cell.x][cell.y] = false;
+            tempCells.emplace_back(Cell(newCoor[0], newCoor[1], false, cell.ro));
         } else {
             tempCells.emplace_back(cell);
         }
@@ -195,27 +192,25 @@ void appendSimulationData() {
 }
 
 
-void countCellsInGrid() {
-    int count = 0;
-    for (int i = 0; i < gridSize; ++i) {
-        for (int j = 0; j < gridSize; ++j) {
-            for (int k = 0; k < gridSize; ++k) {
-                if (grid[i][j][k]) {
-                    ++count;
-                }
-            }
-        }
-    }
-    std::cout << "Total cells in grid: " << count << "\n";
-    if (count == cellsAlive) {
-        std::cout << "The number of cells in the grid matches cellsAlive: " << count << "\n";
-    } else {
-        std::cout << "Mismatch! Number of cells in the grid: " << count << ", cellsAlive: " << cellsAlive << "\n";
-    }
-}
+// void countCellsInGrid() {
+//     int count = 0;
+//     for (int i = 0; i < gridSize; ++i) {
+//         for (int j = 0; j < gridSize; ++j) {
+//                 if (grid[i][j]) {
+//                     ++count;
+//                 }
+//         }
+//     }
+//     std::cout << "Total cells in grid: " << count << "\n";
+//     if (count == cellsAlive) {
+//         std::cout << "The number of cells in the grid matches cellsAlive: " << count << "\n";
+//     } else {
+//         std::cout << "Mismatch! Number of cells in the grid: " << count << ", cellsAlive: " << cellsAlive << "\n";
+//     }
+// }
 int main() {
-    grid[gridSize / 2][gridSize / 2][gridSize / 2] = true;
-    cells.emplace_back(gridSize / 2, gridSize / 2, gridSize / 2, true, rhomax);
+    grid[gridSize / 2][gridSize / 2] = true;
+    cells.emplace_back(gridSize / 2, gridSize / 2, true, rhomax);
     stemcellsAlive = 1;
     cellsAlive = 1;
     simulate();

@@ -116,9 +116,14 @@ public class MasterScriptv02 : MonoBehaviour
     {
         for (step = 0; step < nSteps; step++)
         {
-            if(step % 24 == 0)
-                DestroyCells();
+            
+            //DestroyCells();
             UpdateState();
+            if(step == nSteps-1)
+            {
+                //Console.WriteLine("Numero de vecinos:"+CountAllEmptyNeighbors());
+                Instantiate_cells();
+            }
             
             
             yield return new WaitForSeconds(updateInterval);
@@ -129,7 +134,7 @@ public class MasterScriptv02 : MonoBehaviour
     }
     private void UpdateState()
     {
-        stopwatch2.Start();
+        
         while (cells.Count > 0){
             Cell cell = cells.ElementAt(UnityEngine.Random.Range(0, cells.Count-1));
             
@@ -143,9 +148,6 @@ public class MasterScriptv02 : MonoBehaviour
             }
             cells.Remove(cell);
         }
-        stopwatch2.Stop();
-        UnityEngine.Debug.Log("UpdateState: " + stopwatch2.Elapsed);
-        stopwatch2.Reset();
         // foreach (Cell cell in cells)
         // {
         //     int i = cell.x, j = cell.y, k = cell.z;
@@ -162,8 +164,7 @@ public class MasterScriptv02 : MonoBehaviour
         //copy tempCells to cells
         cells = new List<Cell>(tempCells);
         tempCells.Clear();
-        if(step % 24 == 0)
-            Instantiate_cells();
+        //Instantiate_cells();
         
 
     }
@@ -273,6 +274,16 @@ public class MasterScriptv02 : MonoBehaviour
             tempCells.Add(new Cell(cell));
 
 
+    }
+
+
+    private int CountAllEmptyNeighbors(){
+        int total_empty_neighbors = 0;
+
+        foreach (Cell cell in cells){
+            total_empty_neighbors += GetEmptyNeighbors(cell.x, cell.y, cell.z).Count;
+        }
+        return total_empty_neighbors;
     }
 
     List<Vector3Int> GetEmptyNeighbors(int i, int j, int k)
