@@ -320,7 +320,7 @@ public class tumorPOOParalelo implements Runnable {
       }
       if (thread_id == 0 && step % 24 == 0) {
         endTime = Instant.now();
-        ElapsedTime += Duration.between(startTime, endTime).toMillis();
+        ElapsedTime += Duration.between(startTime, endTime).toMillis() / 1000;
         System.out.println("Day: " + (step / 24));
         System.out.println("cellsAlive: " + cellsAlive);
         System.out.println("stemcellsAlive: " + stemcellsAlive);
