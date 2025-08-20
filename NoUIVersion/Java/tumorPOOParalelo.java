@@ -7,19 +7,6 @@ import java.util.concurrent.*;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.locks.ReentrantLock;
 
-class Cell {
-  int x, y, z;
-  boolean isStemCell;
-  int ro;
-
-  Cell(int x, int y, int z, boolean isStemCell, int ro) {
-    this.x = x;
-    this.y = y;
-    this.z = z;
-    this.isStemCell = isStemCell;
-    this.ro = ro;
-  }
-}
 public class tumorPOOParalelo implements Runnable {
   int thread_id;
   int start_index;
@@ -413,8 +400,6 @@ public class tumorPOOParalelo implements Runnable {
     System.out.println("Total cells alive: " + cellsAlive);
     System.out.println("Total stem cells alive: " + stemcellsAlive);
     System.out.println("Total non-stem cells alive: " + nonStemcellsAlive);
-
-    System.out.println("Total elapsed time: " + ElapsedTime + " ms");
     // verifyCellCount();
   }
 }
