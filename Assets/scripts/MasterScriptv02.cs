@@ -47,6 +47,7 @@ public class MasterScriptv02 : MonoBehaviour
     List<Cell> tempCells;
     private void Awake()
     {
+
         nSteps = days * 24;
         grid = new bool[grid_size, grid_size, grid_size];
         inct = 1.30f;
@@ -62,7 +63,21 @@ public class MasterScriptv02 : MonoBehaviour
         StemCellsAlive = 1;
         NonStemCellsAlive = 0;
         //UnityEngine.Random.InitState(0);
+        // get from dont destroy on load object the simulation parameters
+        SimulationParametersGO simulationParametersGO = FindAnyObjectByType<SimulationParametersGO>();
+        if (simulationParametersGO != null)
+        {
+            UnityEngine.Debug.Log("Simulation Parameters Found");
+            days = simulationParametersGO.nDays;
+            ps = simulationParametersGO.ps;
+            sc_traitvector["rho"] = simulationParametersGO.rho;
+            nsc_traitvector["rho"] = simulationParametersGO.rho;
+            sc_traitvector["alpha"] = simulationParametersGO.alpha;
+            nsc_traitvector["alpha"] = simulationParametersGO.alpha;
+            nSteps = days * 24;
+            UnityEngine.Debug.Log("Days: " + days + " ps: " + ps + " rho: " + sc_traitvector["rho"] + " alpha: " + sc_traitvector["alpha"]);
 
+        }
     }
     private void Start()
     {

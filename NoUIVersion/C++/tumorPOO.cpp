@@ -8,7 +8,6 @@
 #include <set>
 #include <vector>
 
-
 // Clase para representar una célula
 struct Cell {
   int x, y, z;
