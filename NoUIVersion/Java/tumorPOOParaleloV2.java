@@ -376,12 +376,12 @@ public class tumorPOOParaleloV2 implements Runnable {
     for (int i = 0; i < N_THREADS; i++) {
       if (i == N_THREADS - 1) {
         Thread thread = new Thread(
-            new tumorPOOParalelo(i, i * (gridSize / N_THREADS), gridSize - 1));
+            new tumorPOOParaleloV2(i, i * (gridSize / N_THREADS), gridSize - 1));
         threads.add(thread);
         thread.start();
       } else {
         Thread thread = new Thread(
-            new tumorPOOParalelo(i, i * (gridSize / N_THREADS),
+            new tumorPOOParaleloV2(i, i * (gridSize / N_THREADS),
                                  (i + 1) * (gridSize / N_THREADS) - 1));
         threads.add(thread);
         thread.start();
@@ -401,6 +401,6 @@ public class tumorPOOParaleloV2 implements Runnable {
     System.out.println("Total cells alive: " + cellsAlive);
     System.out.println("Total stem cells alive: " + stemcellsAlive);
     System.out.println("Total non-stem cells alive: " + nonStemcellsAlive);
-    // verifyCellCount();
+    verifyCellCount();
   }
 }

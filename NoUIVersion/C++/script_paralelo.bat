@@ -1,6 +1,6 @@
 @echo off
 echo Iniciando simulaciones paralelas...
-g++ TumorPOOParalelo.cpp -o TumorParalelo -std=c++20
+g++ TumorPOOV2Paralelo.cpp -o TumorParalelo -std=c++20
 for /L %%i in (2,2,16) do (
     echo Ejecutando simulación con %%i hilos...
     

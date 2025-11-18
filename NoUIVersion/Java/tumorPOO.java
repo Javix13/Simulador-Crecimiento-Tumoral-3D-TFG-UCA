@@ -127,6 +127,7 @@ public class tumorPOO {
 
   static void updateState() {
     while (!cells.isEmpty()) {
+      
       int index = random.nextInt(cells.size());
       Cell cell = cells.remove(index);
       if (cell.isStemCell) {

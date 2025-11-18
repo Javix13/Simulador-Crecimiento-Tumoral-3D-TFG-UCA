@@ -19,7 +19,7 @@ struct Cell {
 };
 
 // Variables globales
-const int nDays = 70;
+const int nDays = 80;
 const int nSteps = 24 * nDays;
 const int gridSize = 1000;
 bool grid[gridSize][gridSize][gridSize] = {{{false}}};
@@ -37,7 +37,7 @@ const double pm = 10.0 / 24.0;
 const double ps = 0.1;
 const int rhomax = 10;
 const double alpha = 0.01;
-std::default_random_engine generator(0);
+std::default_random_engine generator(std::time(0));
 std::uniform_real_distribution<double> distribution(0.0, 1.0);
 
 // Función para obtener vecinos vacíos

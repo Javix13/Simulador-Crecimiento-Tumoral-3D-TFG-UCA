@@ -2,6 +2,14 @@ using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.UI;
 
+public static class ValidationErrors
+{
+    public const string AllFieldsRequired = "Error: Todos los campos deben estar rellenos.";
+    public const string DaysOutOfRange = "Error: El número de días debe estar entre 1 y 999.";
+    public const string PSOutOfRange = "Error: PS debe estar entre 0 y 100.";
+    public const string AlphaOutOfRange = "Error: Alpha debe estar entre 0 y 100.";
+    public const string InvalidNumberFormat = "Error: Introduce un número válido en todos los campos.";
+}
 public class MenuController : MonoBehaviour
 {
     [SerializeField] private GameObject mainMenu;
@@ -15,7 +23,10 @@ public class MenuController : MonoBehaviour
     [SerializeField] private TMPro.TMP_InputField AlphaInputFieldText;
     [SerializeField] private TMPro.TMP_InputField FilenameInputFieldText;
     [SerializeField] private TMPro.TMP_Text saveConfirmationText;
+    [SerializeField] private TMPro.TMP_Text errorText;
     private SimulationParameters simulationParameters;
+
+    private string errorFunctionName = "HideErrorText";
 
     // Start is called once before the first execution of Update after the MonoBehaviour is created
     void Start()
@@ -87,7 +98,7 @@ public class MenuController : MonoBehaviour
             UnityEngine.SceneManagement.SceneManager.LoadScene(1);
         }
         // Start the simulation loading scene index 1 and send the simulation data to scene 1
-        
+
     }
 
 
@@ -101,6 +112,9 @@ public class MenuController : MonoBehaviour
             string.IsNullOrEmpty(FilenameInputFieldText.text))
         {
             Debug.LogError("All fields must be filled");
+            errorText.text = ValidationErrors.AllFieldsRequired;
+            errorText.gameObject.SetActive(true);
+            Invoke(errorFunctionName, 2f);
             return;
         }
         // verficate nDays is between 1 and 999
@@ -108,14 +122,21 @@ public class MenuController : MonoBehaviour
         if (simulationParameters.nDays < 1 || simulationParameters.nDays > 999)
         {
             Debug.LogError("Days must be between 1 and 999");
+            errorText.text = ValidationErrors.DaysOutOfRange;
+            errorText.gameObject.SetActive(true);
+            Invoke(errorFunctionName, 2f);
+
             return;
         }
         // verificate ps is between 0 and 100
-        
+
         simulationParameters.ps = float.Parse(PSInputFieldText.text) / 100f;
         if (simulationParameters.ps < 0 || simulationParameters.ps > 1)
         {
             Debug.LogError("PS must be between 0 and 100");
+            errorText.text = ValidationErrors.PSOutOfRange;
+            errorText.gameObject.SetActive(true);
+            Invoke(errorFunctionName, 2f);
             return;
         }
 
@@ -126,6 +147,9 @@ public class MenuController : MonoBehaviour
         if (simulationParameters.alpha < 0 || simulationParameters.alpha > 1)
         {
             Debug.LogError("Alpha must be between 0 and 100");
+            errorText.text = ValidationErrors.AlphaOutOfRange;
+            errorText.gameObject.SetActive(true);
+            Invoke(errorFunctionName, 2f);
             return;
         }
         simulationParameters.filename = FilenameInputFieldText.text;
@@ -141,5 +165,10 @@ public class MenuController : MonoBehaviour
     private void HideSaveConfirmationText()
     {
         saveConfirmationText.gameObject.SetActive(false);
+    }
+
+    private void HideErrorText()
+    {
+        errorText.gameObject.SetActive(false);
     }
 }

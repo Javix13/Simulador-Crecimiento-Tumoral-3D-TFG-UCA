@@ -107,7 +107,7 @@ public class MasterScriptv02 : MonoBehaviour
 
     private IEnumerator Simulate()
     {
-        int chunkSize = 1000; // Número de células a procesar por frame
+        int chunkSize = 10; // Número de células a procesar por frame
         while (isSimulating && step <= nSteps)
         {
             // Procesar células en bloques
@@ -128,13 +128,14 @@ public class MasterScriptv02 : MonoBehaviour
             // Copiar tempCells a cells y limpiar tempCells
             cells = new List<Cell>(tempCells);
             tempCells.Clear();
-            Instantiate_cells();
+            //Instantiate_cells();
             yield return new WaitForSeconds(updateInterval);
 
             if (step % 24 == 0)
             {
                 int day = step / 24;
                 OnDayChanged?.Invoke(day, CellsAlive, StemCellsAlive, NonStemCellsAlive);
+                Instantiate_cells();
             }
             step++;
         }
@@ -312,11 +313,11 @@ public class MasterScriptv02 : MonoBehaviour
                 float normalizedValue = clampedValue / rhoMax;
                 colors[index] = normalizedValue < 0.5f
                     ? Color.Lerp(Color.black, Color.blue, normalizedValue * 2)
-                    : Color.Lerp(Color.blue, Color.red, (normalizedValue - 0.5f) * 2);
+                    : Color.Lerp(Color.blue, Color.yellow, (normalizedValue - 0.5f) * 2);
             }
             else
             {
-                colors[index] = Color.clear; // Color especial para stem cells si no lo necesitas
+                colors[index] = Color.clear;
             }
         });
 
