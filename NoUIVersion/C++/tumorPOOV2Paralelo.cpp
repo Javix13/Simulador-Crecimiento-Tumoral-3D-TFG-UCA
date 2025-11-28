@@ -25,10 +25,10 @@ struct Cell {
 
 // Variables globales
 int N_THREADS = 12; // por defecto
-const int nDays = 20;
+const int nDays = 80;
 const int nSteps = 24 * nDays;
 const int min_cells = 0, max_cells = 0;
-const int gridSize = 1000;
+const int gridSize = 500;
 // crear pools de threads
 std::vector<std::thread> threads;
 std::vector<std::array<std::array<int, 3>, 2>> threadCoorsInDangerZone;

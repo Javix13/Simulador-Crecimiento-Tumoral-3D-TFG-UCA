@@ -11,13 +11,13 @@ public class MasterScriptv02 : MonoBehaviour
 {
     // Evento para notificar cambio de día
     public event System.Action<int, int, int, int> OnDayChanged;
+    
     public Dictionary<string, float> sc_traitvector = new Dictionary<string, float> {
         { "cct", 24 }, { "rho_max", 10 }, { "mu", 100 }, { "alpha", 0 }
     };
     public Dictionary<string, float> nsc_traitvector = new Dictionary<string, float> {
         { "cct", 24 }, { "rho_max", 10 }, { "mu", 100 }, { "alpha", 0.01f }
     };
-
     private float inct;
     private float pd;
     private float pm;
@@ -125,17 +125,17 @@ public class MasterScriptv02 : MonoBehaviour
                 }
                 yield return null; // Espera al siguiente frame antes de continuar con el siguiente bloque
             }
-            // Copiar tempCells a cells y limpiar tempCells
-            cells = new List<Cell>(tempCells);
-            tempCells.Clear();
-            //Instantiate_cells();
+            (tempCells, cells) = (cells, tempCells);
+            tempCells.Clear(); 
+            Instantiate_cells();
             yield return new WaitForSeconds(updateInterval);
-
+            
+            
             if (step % 24 == 0)
             {
                 int day = step / 24;
                 OnDayChanged?.Invoke(day, CellsAlive, StemCellsAlive, NonStemCellsAlive);
-                Instantiate_cells();
+                //Instantiate_cells();
             }
             step++;
         }

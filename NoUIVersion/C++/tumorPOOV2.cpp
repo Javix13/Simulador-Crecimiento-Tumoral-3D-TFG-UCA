@@ -21,7 +21,7 @@ struct Cell {
 // Variables globales
 const int nDays = 80;
 const int nSteps = 24 * nDays;
-const int gridSize = 1000;
+const int gridSize = 500;
 bool grid[gridSize][gridSize][gridSize] = {{{false}}};
 std::vector<Cell> cells;
 std::vector<Cell> tempCells;
