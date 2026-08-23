@@ -25,24 +25,23 @@ struct Cell {
 
 // Variables globales
 int N_THREADS = 12; // por defecto
-const int nDays = 80;
+const int nDays = 120;
 const int nSteps = 24 * nDays;
 const int min_cells = 0, max_cells = 0;
 const int gridSize = 500;
-// crear pools de threads
+
 std::vector<std::thread> threads;
 std::vector<std::array<std::array<int, 3>, 2>> threadCoorsInDangerZone;
 
 std::vector<std::unique_ptr<std::mutex>> threadDangerZoneMutexes;
 std::vector<std::unique_ptr<std::mutex>> threadCellsMutexes;
 
-// crea un vector para guardar los timestamps por dia
-
 int cellSize = gridSize / N_THREADS;
 bool grid[gridSize][gridSize][gridSize] = {{{false}}};
 std::vector<std::vector<Cell>> threadCells;
 std::vector<std::vector<Cell>> threadTempCells;
-double ElapsedTime = 0;
+double runTime = 0;
+std::chrono::time_point<std::chrono::high_resolution_clock> start, end;
 
 std::atomic<int> stemcellsAlive = 0;
 std::atomic<int> nonStemcellsAlive = 0;
@@ -356,22 +355,16 @@ void updateState(int thread_id, int start_index, int end_index,
 void parallel_simulation(int thread_id, int start_index, int end_index) {
   std::default_random_engine generator(time(0));
   std::uniform_real_distribution<double> distribution(0.0, 1.0);
-  std::chrono::time_point<std::chrono::system_clock> start, end;
-  start = std::chrono::system_clock::now();
-  std::chrono::duration<double> elapsed_seconds;
   for (int step = 1; step <= nSteps; ++step) {
     updateState(thread_id, start_index, end_index, generator, distribution);
     barrier->arrive_and_wait();
     if (thread_id == 0 && step % 24 == 0) {
-      end = std::chrono::system_clock::now();
-      elapsed_seconds = end - start;
-      auto elapsed = elapsed_seconds.count();
-
+      std::chrono::time_point<std::chrono::high_resolution_clock> elapsedTime;
+      elapsedTime = std::chrono::high_resolution_clock::now();
+      std::chrono::duration<double> elapsedSecondsDuration = elapsedTime-start;
       std::cout << "Day: " << step / 24 << "\n";
       std::cout << "cellsAlive: " << cellsAlive << "\n";
-      std::cout << "Elapsed time: " << elapsed << "s\n";
-      ElapsedTime += elapsed;
-      start = std::chrono::system_clock::now();
+      std::cout << "Elapsed time: " << elapsedSecondsDuration.count() << "s\n";
     }
     threadCells[thread_id].swap(threadTempCells[thread_id]);
     threadTempCells[thread_id].clear();
@@ -403,7 +396,7 @@ void appendSimulationData() {
                          std::to_string(nDays) + "days.txt",
                      std::ios::app);
   if (file.is_open()) {
-    file << cellsAlive << ":" << ElapsedTime << "\n";
+    file << cellsAlive << ":" << runTime << "\n";
     file.close();
   } else {
     std::cerr << "Error opening file for appending data.\n";
@@ -446,6 +439,7 @@ int main(int argc, char *argv[]) {
   stemcellsAlive = 1;
   cellsAlive = 1;
   // Crear los threads
+   start = std::chrono::high_resolution_clock::now();
   for (int i = 0; i < N_THREADS; ++i) {
     if (i == N_THREADS - 1)
       threads[i] = std::thread(parallel_simulation, i,
@@ -459,10 +453,14 @@ int main(int argc, char *argv[]) {
   for (auto &thread : threads) {
     thread.join();
   }
+  end = std::chrono::high_resolution_clock::now();
+  std::chrono::duration<double> runTimeDuration = end-start;
+
+  runTime= runTimeDuration.count();
   std::cout << "stemcellsAlive: " << stemcellsAlive << "\n";
   std::cout << "nonStemcellsAlive: " << nonStemcellsAlive << "\n";
   std::cout << "cellsAlive: " << cellsAlive << "\n";
-  std::cout << "Elapsed time: " << ElapsedTime << "s\n";
+  std::cout << "Total time: " << runTime << "s\n";
   std::cout << "Number of threads: " << N_THREADS << std::endl;
   countCellsInGrid();
   verifyCellCount();

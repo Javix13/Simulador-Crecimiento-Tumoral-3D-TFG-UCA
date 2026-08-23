@@ -2,68 +2,87 @@ using System;
 using System.Collections;
 using System.Collections.Generic;
 using System.Diagnostics;
-using System.Linq;
 using UnityEngine;
 using UnityEngine.InputSystem;
 using UnityEngine.UI;
 
 public class MasterScriptv02 : MonoBehaviour
 {
-    // Evento para notificar cambio de día
     public event System.Action<int, int, int, int> OnDayChanged;
-    
+    public event System.Action<bool> OnPause;
+
     public Dictionary<string, float> sc_traitvector = new Dictionary<string, float> {
         { "cct", 24 }, { "rho_max", 10 }, { "mu", 100 }, { "alpha", 0 }
     };
+
     public Dictionary<string, float> nsc_traitvector = new Dictionary<string, float> {
         { "cct", 24 }, { "rho_max", 10 }, { "mu", 100 }, { "alpha", 0.01f }
     };
+
     private float inct;
     private float pd;
     private float pm;
     private readonly float updateInterval = 0.2f;
+
     public float ps = 0.1f;
     public int grid_size;
-    public GameObject scellPrefab;
-    public GameObject nscellPrefab;
-    private List<GameObject> PreInstantiatedCells;
+
     public int CellsAlive;
     public int StemCellsAlive;
     public int NonStemCellsAlive;
-    private int step = 1;
 
+    private int step = 1;
     public int days = 80;
     public int nSteps;
     public Text text;
     public float time;
     private bool isSimulating = false;
+
     public Stopwatch stopwatch1 = new Stopwatch();
     public Stopwatch stopwatch2 = new Stopwatch();
     public Stopwatch stopwatch3 = new Stopwatch();
 
-
     bool[,,] grid;
     List<Cell> cells;
     List<Cell> tempCells;
+
+    [Header("Indirect voxel rendering")]
+    public Material voxelMaterial;
+    public float voxelScale = 0.95f;
+
+    private Mesh voxelMesh;
+    private ComputeBuffer voxelBuffer;
+    private ComputeBuffer argsBuffer;
+    private Bounds drawBounds;
+
+    private struct VoxelRenderData
+    {
+        public Vector4 posScale; // xyz = posición, w = escala
+        public Vector4 color;    // rgba
+    }
+
+    private readonly List<VoxelRenderData> voxelData = new List<VoxelRenderData>();
+    private readonly uint[] args = new uint[5];
+
     private void Awake()
     {
-
         nSteps = days * 24;
         grid = new bool[grid_size, grid_size, grid_size];
         inct = 1.30f;
         pd = 1.0f / 24.0f * inct;
         pm = 10.0f / 24.0f;
+
         cells = new List<Cell>();
         tempCells = new List<Cell>();
-        PreInstantiatedCells = new List<GameObject>();
+
         int center = grid_size / 2;
         grid[center, center, center] = true;
         cells.Add(new Cell(center, center, center, true, (int)sc_traitvector["rho_max"]));
+
         CellsAlive = 1;
         StemCellsAlive = 1;
         NonStemCellsAlive = 0;
-        //UnityEngine.Random.InitState(0);
-        // get from dont destroy on load object the simulation parameters
+
         SimulationParametersGO simulationParametersGO = FindAnyObjectByType<SimulationParametersGO>();
         if (simulationParametersGO != null)
         {
@@ -76,41 +95,58 @@ public class MasterScriptv02 : MonoBehaviour
             nsc_traitvector["alpha"] = simulationParametersGO.alpha;
             nSteps = days * 24;
             UnityEngine.Debug.Log("Days: " + days + " ps: " + ps + " rho: " + sc_traitvector["rho"] + " alpha: " + sc_traitvector["alpha"]);
-
         }
+
+        SetupVoxelRenderer();
+        UploadVoxelData();
     }
+
+    private void SetupVoxelRenderer()
+    {
+        GameObject sphere = GameObject.CreatePrimitive(PrimitiveType.Sphere);
+        voxelMesh = sphere.GetComponent<MeshFilter>().sharedMesh;
+        Destroy(sphere);
+
+        if (voxelMaterial != null)
+            voxelMaterial.enableInstancing = true;
+
+        Vector3 center = new Vector3((grid_size - 1) * 0.5f, (grid_size - 1) * 0.5f, (grid_size - 1) * 0.5f) * voxelScale;
+        Vector3 size = new Vector3(grid_size, grid_size, grid_size) * voxelScale * 2f;
+        drawBounds = new Bounds(center, size);
+    }
+
     private void Start()
     {
         time = Time.realtimeSinceStartup;
-        for (int i = 1; i < 300000; i++)
-        {
-            GameObject cell = Instantiate(scellPrefab, new Vector3(0, 0, 0), Quaternion.identity);
-            cell.SetActive(false);
-            PreInstantiatedCells.Add(cell);
-        }
         isSimulating = true;
         StartCoroutine(Simulate());
     }
 
-    private void Update()
+    private void LateUpdate()
     {
-        // si el usuario pulsa la espacio, inicia o para la simulacion;
+        if(Input.GetKey("escape") && !isSimulating)
+        {
+            UnityEngine.SceneManagement.SceneManager.LoadScene(0);
+        }
         if (Keyboard.current.spaceKey.wasPressedThisFrame)
         {
             isSimulating = !isSimulating;
+            OnPause?.Invoke(isSimulating);
             if (isSimulating)
             {
                 StartCoroutine(Simulate());
             }
         }
+
+        DrawVoxels();
     }
 
     private IEnumerator Simulate()
     {
-        int chunkSize = 10; // Número de células a procesar por frame
+        int chunkSize = 10;
+
         while (isSimulating && step <= nSteps)
         {
-            // Procesar células en bloques
             int totalCells = cells.Count;
             for (int i = 0; i < totalCells; i += chunkSize)
             {
@@ -123,25 +159,128 @@ public class MasterScriptv02 : MonoBehaviour
                     else
                         Update_nscells(cell);
                 }
-                yield return null; // Espera al siguiente frame antes de continuar con el siguiente bloque
+                yield return null;
             }
+
             (tempCells, cells) = (cells, tempCells);
-            tempCells.Clear(); 
-            Instantiate_cells();
+            tempCells.Clear();
+
+            UploadVoxelData();
+
             yield return new WaitForSeconds(updateInterval);
-            
-            
-            if (step % 24 == 0)
-            {
-                int day = step / 24;
+
+            //if (step % 24 == 0)
+            //{
+                int day = (step / 24) + 1;
                 OnDayChanged?.Invoke(day, CellsAlive, StemCellsAlive, NonStemCellsAlive);
-                //Instantiate_cells();
-            }
+            //}
+
             step++;
         }
-
     }
-    // UpdateState ya no es necesario, la lógica se movió a Simulate con procesamiento por bloques
+
+    private void UploadVoxelData()
+    {
+        voxelData.Clear();
+
+        float rhoMax = nsc_traitvector["rho_max"];
+
+        for (int i = 0; i < cells.Count; i++)
+        {
+            Cell cell = cells[i];
+            Color color;
+
+            if (cell.isStemCell)
+            {
+                color = Color.red;
+            }
+            else
+            {
+                float clampedValue = Mathf.Clamp(cell.ro, 0f, rhoMax);
+                float normalizedValue = clampedValue / rhoMax;
+
+                color = normalizedValue < 0.5f
+                    ? Color.Lerp(Color.black, Color.white, normalizedValue * 2f)
+                    : Color.Lerp(Color.white, Color.red, (normalizedValue - 0.5f) * 2f);
+            }
+
+            voxelData.Add(new VoxelRenderData
+            {
+                posScale = new Vector4(cell.x, cell.y, cell.z, voxelScale),
+                color = color
+            });
+        }
+
+        if (voxelData.Count == 0 || voxelMaterial == null || voxelMesh == null)
+            return;
+
+        EnsureBuffers(voxelData.Count);
+
+        voxelBuffer.SetData(voxelData);
+
+        args[0] = voxelMesh.GetIndexCount(0);
+        args[1] = (uint)voxelData.Count;
+        args[2] = voxelMesh.GetIndexStart(0);
+        args[3] = voxelMesh.GetBaseVertex(0);
+        args[4] = 0;
+
+        argsBuffer.SetData(args);
+        voxelMaterial.SetBuffer("_VoxelBuffer", voxelBuffer);
+    }
+
+    private void EnsureBuffers(int count)
+    {
+        const int stride = sizeof(float) * 8; // posScale(4) + color(4)
+
+        if (voxelBuffer == null || voxelBuffer.count < count)
+        {
+            ReleaseVoxelBuffer();
+            voxelBuffer = new ComputeBuffer(count, stride);
+        }
+
+        if (argsBuffer == null)
+        {
+            argsBuffer = new ComputeBuffer(1, args.Length * sizeof(uint), ComputeBufferType.IndirectArguments);
+        }
+    }
+
+    private void DrawVoxels()
+    {
+        if (voxelMaterial == null || voxelMesh == null || argsBuffer == null || voxelData.Count == 0)
+            return;
+
+        Graphics.DrawMeshInstancedIndirect(
+            voxelMesh,
+            0,
+            voxelMaterial,
+            drawBounds,
+            argsBuffer
+        );
+    }
+
+    private void ReleaseVoxelBuffer()
+    {
+        if (voxelBuffer != null)
+        {
+            voxelBuffer.Release();
+            voxelBuffer = null;
+        }
+    }
+
+    private void ReleaseArgsBuffer()
+    {
+        if (argsBuffer != null)
+        {
+            argsBuffer.Release();
+            argsBuffer = null;
+        }
+    }
+
+    private void OnDestroy()
+    {
+        ReleaseVoxelBuffer();
+        ReleaseArgsBuffer();
+    }
 
     private void Update_scells(Cell cell)
     {
@@ -286,106 +425,4 @@ public class MasterScriptv02 : MonoBehaviour
         }
         return neighbors;
     }
-    private void DestroyCells()
-    {
-        for (int cell = 0; cell < CellsAlive; cell++)
-        {
-            PreInstantiatedCells[cell].SetActive(false);
-        }
-    }
-
-    private void Instantiate_cells()
-    {
-        MaterialPropertyBlock propertyBlock = new MaterialPropertyBlock();
-        float rhoMax = nsc_traitvector["rho_max"];
-        Vector3[] positions = new Vector3[cells.Count];
-        Color[] colors = new Color[cells.Count];
-
-        // Procesar datos en paralelo
-        System.Threading.Tasks.Parallel.For(0, cells.Count, index =>
-        {
-            Cell cell = cells[index];
-            positions[index] = new Vector3(cell.x, cell.y, cell.z);
-
-            if (!cell.isStemCell)
-            {
-                float clampedValue = Mathf.Clamp(cell.ro, 0f, rhoMax);
-                float normalizedValue = clampedValue / rhoMax;
-                colors[index] = normalizedValue < 0.5f
-                    ? Color.Lerp(Color.black, Color.blue, normalizedValue * 2)
-                    : Color.Lerp(Color.blue, Color.yellow, (normalizedValue - 0.5f) * 2);
-            }
-            else
-            {
-                colors[index] = Color.clear;
-            }
-        });
-
-        // Aplicar los datos procesados en el Main Thread
-        for (int i = 0; i < cells.Count; i++)
-        {
-            GameObject nscell = PreInstantiatedCells[i];
-            nscell.transform.position = positions[i];
-            nscell.SetActive(true);
-
-            if (!cells[i].isStemCell)
-            {
-                Renderer renderer = nscell.GetComponent<Renderer>();
-                if (renderer != null)
-                {
-                    renderer.GetPropertyBlock(propertyBlock);
-                    propertyBlock.SetColor("_BaseColor", colors[i]);
-                    renderer.SetPropertyBlock(propertyBlock);
-                }
-            }
-        }
-    }
-
-
-    //Version secuencial
-
-    // private void Instantiate_cells()
-    // {
-    //     MaterialPropertyBlock propertyBlock = new MaterialPropertyBlock();
-    //     int actual_cell = 0;
-
-    //     foreach (Cell cell in cells)
-    //     {
-    //         int i = cell.x, j = cell.y, k = cell.z;
-    //         GameObject nscell = PreInstantiatedCells[actual_cell];
-    //         nscell.transform.position = new Vector3(i, j, k);
-    //         nscell.SetActive(true);
-
-    //         if (cell.isStemCell)
-    //         {
-    //             actual_cell++;
-    //             continue;
-    //         }
-
-    //         // Calcular el color de la célula
-    //         float clampedValue = Mathf.Clamp(cell.ro, 0f, nsc_traitvector["rho_max"]);
-    //         float normalizedValue = clampedValue / nsc_traitvector["rho_max"];
-    //         Color color = normalizedValue < 0.5f
-    //             ? Color.Lerp(Color.blue, Color.white, normalizedValue * 2)
-    //             : Color.Lerp(Color.white, Color.red, (normalizedValue - 0.5f) * 2);
-
-    //         // Aplicar el color
-    //         Renderer renderer = nscell.GetComponent<Renderer>();
-    //         if (renderer != null)
-    //         {
-    //             renderer.GetPropertyBlock(propertyBlock);
-    //             propertyBlock.SetColor("_BaseColor", color);
-    //             renderer.SetPropertyBlock(propertyBlock);
-    //         }
-    //         else
-    //         {
-    //             UnityEngine.Debug.LogWarning($"El prefab '{nscell.name}' no tiene un Renderer.");
-    //         }
-
-    //         actual_cell++;
-    //     }
-    // }
-
-
-
 }

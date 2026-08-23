@@ -75,3 +75,8 @@ crashlytics-build.properties
 /[Aa]ssets/[Ss]treamingAssets/aa/*
 NoUIVersion/naive.cpp
 *.class
+
+# Results folder
+/NoUIVersion/AllResults/*
+/NoUIVersion/C++/results/*
+/NoUIVersion/Java/results/*

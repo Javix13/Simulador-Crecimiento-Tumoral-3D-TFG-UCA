@@ -6,18 +6,19 @@ import java.util.*;
 
 public class tumorPOOV2 {
   // Configuración
-  static final int nDays = 50;
+  static final int nDays = 120;
   static final int nSteps = 24 * nDays;
   static final int min_cells = 0, max_cells = 0;
-  static final int gridSize = 1000;
+  static final int gridSize = 500;
   static boolean[][][] grid = new boolean[gridSize][gridSize][gridSize];
   static ArrayList<Cell> cells = new ArrayList<>();
   static ArrayList<Cell> tempCells = new ArrayList<>();
-  static ArrayList<Integer> cellsAliveByDay = new ArrayList<>();
+  //static ArrayList<Integer> cellsAliveByDay = new ArrayList<>();
   static int stemcellsAlive = 0;
   static int nonStemcellsAlive = 0;
   static int cellsAlive = 0;
-  static double ElapsedTime = 0.0;
+  static double runTime = 0.0;
+  static Instant startTime, endTime;
 
   // Parámetros de simulación
   static final double pd = 1.0 / 24.0 * 1.30;
@@ -139,30 +140,29 @@ public class tumorPOOV2 {
   }
 
   static void simulate() {
-    Instant start = Instant.now();
+    startTime= Instant.now();
     for (int step = 1; step <= nSteps; step++) {
       updateState();
       if (step % 24 == 0) {
-        Instant end = Instant.now();
-        double elapsed = Duration.between(start, end).toMillis() / 1000.0;
-        cellsAliveByDay.add(cellsAlive);
-        ElapsedTime += elapsed;
+        Instant elapsedTime= Instant.now();
+        //cellsAliveByDay.add(cellsAlive);
         System.out.println("Day: " + (step / 24));
         System.out.println("cellsAlive: " + cellsAlive);
-        System.out.println("Elapsed time: " + elapsed + "s");
-        start = Instant.now();
+        System.out.println("Elapsed time: " + Duration.between(startTime, elapsedTime).toMillis() / 1000 + "s");
       }
       cells = new ArrayList<>(tempCells);
       tempCells.clear();
     }
-    System.out.println("Total elapsed time: " + ElapsedTime + "s");
+    endTime=Instant.now();
+    runTime = Duration.between(startTime, endTime).toMillis() / 1000;
+    System.out.println("Total run time: " + runTime + "s");
   }
 
   static void appendSimulationData() {
     String filename =
         "simdata1threads" + gridSize + "grid" + nDays + "days.txt";
     try (FileWriter file = new FileWriter(filename, true)) {
-      file.write(cellsAlive + ":" + ElapsedTime + "\n");
+      file.write(cellsAlive + ":" + runTime + "\n");
     } catch (IOException e) {
       System.err.println("Error opening file for appending data.");
     }

@@ -1,7 +1,13 @@
 @echo off
 echo Iniciando simulaciones paralelas...
-g++ -O2 TumorPOOV2Paralelo.cpp -o TumorParalelo -std=c++20
-for /L %%i in (5,5,10) do (
+g++ TumorPOOV2Paralelo.cpp -o TumorParalelo -std=c++20
+for /L %%j in (1,1,5) do (
+	
+        echo - Simulación %%j con %%i hilos...
+        TumorParalelo -th 2
+        echo - Simulación %%j con %%i hilos finalizada.
+    )
+for /L %%i in (4,4,12) do (
     echo Ejecutando simulación con %%i hilos...
     
     for /L %%j in (1,1,5) do (
@@ -13,6 +19,8 @@ for /L %%i in (5,5,10) do (
     
     echo Simulaciones con %%i hilos terminadas.
 )
+
+
 
 echo Todas las simulaciones han terminado.
 pause

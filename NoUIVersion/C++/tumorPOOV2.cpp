@@ -19,7 +19,7 @@ struct Cell {
 };
 
 // Variables globales
-const int nDays = 80;
+const int nDays = 120;
 const int nSteps = 24 * nDays;
 const int gridSize = 500;
 bool grid[gridSize][gridSize][gridSize] = {{{false}}};
@@ -28,7 +28,8 @@ std::vector<Cell> tempCells;
 int stemcellsAlive = 0;
 int nonStemcellsAlive = 0;
 int cellsAlive = 0;
-double ElapsedTime = 0;
+double runTime = 0;
+std::chrono::time_point<std::chrono::high_resolution_clock> start, end;
 
 // Parámetros de simulación
 const double pd = 1.0 / 24.0 * 1.30;
@@ -162,34 +163,28 @@ void updateState() {
 
 // Función para simular
 void simulate() {
-  std::chrono::time_point<std::chrono::system_clock> start, end;
   std::chrono::duration<double> elapsed_seconds;
-  start = std::chrono::system_clock::now();
 
   for (int step = 1; step <= nSteps; ++step) {
     updateState();
     if (step % 24 == 0) {
-      end = std::chrono::system_clock::now();
-      elapsed_seconds = end - start;
-      double elapsed = elapsed_seconds.count();
-      ElapsedTime += elapsed;
-      start = std::chrono::system_clock::now();
+      std::chrono::time_point<std::chrono::high_resolution_clock> elapsedTime;
+      elapsedTime = std::chrono::high_resolution_clock::now();
+      std::chrono::duration<double> elapsedTimeDuration = elapsedTime-start;
       std::cout << "Day: " << step / 24 << "\n";
       std::cout << "cellsAlive: " << cellsAlive << "\n";
-      std::cout << "Elapsed time: " << elapsed << "s\n";
-      start = std::chrono::system_clock::now();
+      std::cout << "Elapsed time: " << elapsedTimeDuration.count() << "s\n";
     }
     cells.swap(tempCells);
     tempCells.clear();
   }
-  std::cout << "Total elapsed time: " << ElapsedTime << "s\n";
 }
 void appendSimulationData() {
   std::ofstream file("simdata1threads" + std::to_string(gridSize) + "grid" +
                          std::to_string(nDays) + "days.txt",
                      std::ios::app);
   if (file.is_open()) {
-    file << cellsAlive << ":" << ElapsedTime << "\n";
+    file << cellsAlive << ":" << runTime << "\n";
     file.close();
   } else {
     std::cerr << "Error opening file for appending data.\n";
@@ -201,7 +196,12 @@ int main() {
   cells.emplace_back(gridSize / 2, gridSize / 2, gridSize / 2, true, rhomax);
   stemcellsAlive = 1;
   cellsAlive = 1;
+  start = std::chrono::high_resolution_clock::now();
   simulate();
+  end = std::chrono::high_resolution_clock::now();
+  std::chrono::duration<double> runTimeDuration = end-start;
+  runTime=runTimeDuration.count();
+  std::cout << "Total run time: " << runTime << "s\n";
   appendSimulationData();
   return 0;
 }

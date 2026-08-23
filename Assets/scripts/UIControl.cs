@@ -6,11 +6,15 @@ public class UIControl : MonoBehaviour
 {
     [SerializeField] private MasterScriptv02 simulation_master;
     [SerializeField] private Text text;
+    [SerializeField] public TMPro.TMP_Text pauseText;
+
+    [SerializeField] public TMPro.TMP_Text exitText;
 
     void OnEnable()
     {
         if (simulation_master != null)
             simulation_master.OnDayChanged += UpdateUI;
+            simulation_master.OnPause += UpdatePauseText;
     }
 
     void OnDisable()
@@ -33,6 +37,13 @@ public class UIControl : MonoBehaviour
 
     public void UpdateUI(int day, int cells_alive, int stem_cells_alive, int non_stem_cells_alive)
     {
-        text.text = "Day: " + day + "\n" + "Cells Alive: " + cells_alive + "\n" + "Stem Cells Alive: " + stem_cells_alive + "\n" + "Non Stem Cells Alive: " + non_stem_cells_alive;
+        text.text = "Día: " + day + "\n" + "Células vivas: " + cells_alive + "\n" + "Células madre vivas: " + stem_cells_alive + "\n" + "Células no madre vivas: " + non_stem_cells_alive;
+    }
+
+    public void UpdatePauseText(bool isSimulating)
+    {
+        pauseText.gameObject.SetActive(!isSimulating);
+        exitText.gameObject.SetActive(!isSimulating);
+        
     }
 }

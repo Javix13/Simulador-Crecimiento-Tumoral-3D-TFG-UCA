@@ -1,8 +1,8 @@
 @echo off
-g++ -O2 TumorPOOV2.cpp -o TumorPOO -std=c++20
+g++ TumorPOOV2.cpp -o TumorPOO -std=c++20
 echo Iniciando simulaciones secuenciales...
 
-for /L %%i in (1,1,5) do (
+for /L %%i in (1,1,10) do (
     echo Ejecutando simulación %%i...
     TumorPOO
     echo Simulación %%i finalizada.

@@ -82,9 +82,7 @@ public class MenuController : MonoBehaviour
 
     public void StartSimulation()
     {
-        //load JSON name from the dropdown
         string jsonName = simulationFilesDropdown.options[simulationFilesDropdown.value].text;
-        // Load the JSON file and deserialize it into the simulation parameters
         string jsonPath = System.IO.Path.Combine(Application.persistentDataPath, jsonName + ".json");
         if (System.IO.File.Exists(jsonPath))
         {
@@ -97,7 +95,6 @@ public class MenuController : MonoBehaviour
             DontDestroyOnLoad(simulationParametersGO);
             UnityEngine.SceneManagement.SceneManager.LoadScene(1);
         }
-        // Start the simulation loading scene index 1 and send the simulation data to scene 1
 
     }
 
