@@ -157,6 +157,7 @@ public class MenuController : MonoBehaviour
         // mostrar durante 2 segundos el texto de guardado con exito
         saveConfirmationText.gameObject.SetActive(true);
         Invoke("HideSaveConfirmationText", 2f);
+        clearFieldTexts();
     }
 
     private void HideSaveConfirmationText()
@@ -167,5 +168,14 @@ public class MenuController : MonoBehaviour
     private void HideErrorText()
     {
         errorText.gameObject.SetActive(false);
+    }
+    private void clearFieldTexts()
+    {
+        DaysInputFieldText.text = string.Empty;
+        PSInputFieldText.text = string.Empty;
+        RhoInputFieldText.text = string.Empty;
+        AlphaInputFieldText.text = string.Empty;
+        FilenameInputFieldText.text = string.Empty;
+        
     }
 }
