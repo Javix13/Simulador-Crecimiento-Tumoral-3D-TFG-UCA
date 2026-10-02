@@ -21,7 +21,7 @@ Las versiones de **C++** y **Java** han sido probadas en:
 
 * Windows 10
 * Windows 11
-* Ubuntu
+* Ubuntu 26.04.1 LTS
 * macOS Sequoia 15.5
 
 La versión desarrollada en **Unity** está disponible únicamente para **Windows**.
@@ -79,15 +79,22 @@ g++ TumorPOOV2Paralelo.cpp -o NombreEjecutable -std=c++20
 Una vez compilados los programas, pueden ejecutarse desde la terminal.
 
 ##### Versión secuencial
-
+###### Windows
 ```bash
 NombreEjecutable
 ```
-
+###### Ubuntu / MacOS
+```bash
+./NombreEjecutable
+```
 ##### Versión paralela
-
+###### Windows
 ```bash
 NombreEjecutable -th NumerodeHilos
+```
+###### Ubuntu / MacOS
+```bash
+./NombreEjecutable -th NumerodeHilos
 ```
 
 Donde:
