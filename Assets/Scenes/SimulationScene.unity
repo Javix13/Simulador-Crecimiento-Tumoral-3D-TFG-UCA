@@ -784,7 +784,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   ps: 0.1
-  grid_size: 1000
+  grid_size: 100
   scellPrefab: {fileID: 3080924374024195280, guid: f27f6b63ec05f964499bb3017ed2233a, type: 3}
   nscellPrefab: {fileID: 8115864941254175448, guid: 126bb7d1ae194d94e8cb346e63d00311, type: 3}
   NonStemCellExMaterial: {fileID: 2100000, guid: 4f621ac2db8e93342a14ec40de079547, type: 2}
@@ -809,7 +809,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   ps: 0.1
-  grid_size: 100
+  grid_size: 250
   CellsAlive: 0
   StemCellsAlive: 0
   NonStemCellsAlive: 0

@@ -7,7 +7,11 @@ Shader "Custom/VoxelIndirect"
 
     SubShader
     {
-        Tags { "RenderType"="Opaque" "Queue"="Geometry" }
+        Tags
+        {
+            "RenderType" = "Opaque"
+            "Queue" = "Geometry"
+        }
 
         Pass
         {
@@ -15,11 +19,16 @@ Shader "Custom/VoxelIndirect"
             ZWrite On
 
             HLSLPROGRAM
+
             #pragma target 4.5
             #pragma vertex vert
             #pragma fragment frag
 
             #include "UnityCG.cginc"
+
+            // Soporte para RenderMeshIndirect
+            #define UNITY_INDIRECT_DRAW_ARGS IndirectDrawIndexedArgs
+            #include "UnityIndirect.cginc"
 
             struct VoxelRenderData
             {
@@ -28,6 +37,7 @@ Shader "Custom/VoxelIndirect"
             };
 
             StructuredBuffer<VoxelRenderData> _VoxelBuffer;
+
             float4 _BaseColor;
 
             struct appdata
@@ -44,12 +54,28 @@ Shader "Custom/VoxelIndirect"
 
             v2f vert(appdata v)
             {
+                // Inicializa los argumentos del renderizado indirecto
+                InitIndirectDrawArgs(0);
+
                 v2f o;
 
-                VoxelRenderData data = _VoxelBuffer[v.instanceID];
-                float3 worldPos = data.posScale.xyz + v.vertex * data.posScale.w;
+                // Obtener el ID real de la instancia
+                uint instanceID = GetIndirectInstanceID(v.instanceID);
 
-                o.pos = UnityWorldToClipPos(float4(worldPos, 1.0));
+                // Obtener los datos de esta célula
+                VoxelRenderData data = _VoxelBuffer[instanceID];
+
+                // Posición y escala
+                float3 worldPos =
+                    data.posScale.xyz +
+                    v.vertex * data.posScale.w;
+
+                // Transformación a espacio de pantalla
+                o.pos = UnityWorldToClipPos(
+                    float4(worldPos, 1.0)
+                );
+
+                // Color de la célula
                 o.color = data.color * _BaseColor;
 
                 return o;
@@ -59,6 +85,7 @@ Shader "Custom/VoxelIndirect"
             {
                 return i.color;
             }
+
             ENDHLSL
         }
     }

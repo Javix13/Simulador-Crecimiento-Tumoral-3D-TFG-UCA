@@ -15,10 +15,10 @@ public class CameraControl : MonoBehaviour
         int center = simulation_master.GetComponent<MasterScriptv02>().grid_size / 2;
         int grid_size = simulation_master.GetComponent<MasterScriptv02>().grid_size;
         cameraPositions = new Vector3Int[4];
-        cameraPositions[0] = new Vector3Int(center, center, center - grid_size * 2);
-        cameraPositions[1] = new Vector3Int(center + grid_size * 2, center, center);
-        cameraPositions[2] = new Vector3Int(center, center, center + grid_size * 2);
-        cameraPositions[3] = new Vector3Int(center - grid_size * 2, center, center);
+        cameraPositions[0] = new Vector3Int(center, center, center - grid_size);
+        cameraPositions[1] = new Vector3Int(center + grid_size, center, center);
+        cameraPositions[2] = new Vector3Int(center, center, center + grid_size);
+        cameraPositions[3] = new Vector3Int(center - grid_size, center, center);
         controlled_camera.transform.position = cameraPositions[0];
     }
 

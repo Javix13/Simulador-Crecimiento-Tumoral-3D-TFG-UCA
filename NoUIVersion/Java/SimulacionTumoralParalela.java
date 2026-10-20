@@ -7,11 +7,11 @@ import java.util.concurrent.*;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.locks.ReentrantLock;
 
-public class tumorPOOParalelo implements Runnable {
+public class tumorPOOParaleloV2 implements Runnable {
   int thread_id;
   int start_index;
   int end_index;
-  tumorPOOParalelo(int thread_id, int start_index, int end_index) {
+  tumorPOOParaleloV2(int thread_id, int start_index, int end_index) {
     this.thread_id = thread_id;
     this.start_index = start_index;
     this.end_index = end_index;
@@ -20,7 +20,7 @@ public class tumorPOOParalelo implements Runnable {
   static int N_THREADS;
   static final int nDays = 80;
   static final int nSteps = 24 * nDays;
-  static final int gridSize = 1000;
+  static final int gridSize = 500;
   static final double pd = 1.0 / 24.0 * 1.30;
   static final double pm = 10.0 / 24.0;
   static final double ps = 0.1;
@@ -43,9 +43,9 @@ public class tumorPOOParalelo implements Runnable {
   static AtomicInteger cellsAlive = new AtomicInteger(0);
 
   static CyclicBarrier barrier;
-  static double ElapsedTime = 0;
-
-  static boolean inDangerZone(int x, int y, int z, int start_index,
+  static double runTime = 0;
+  public Random random = new Random();
+  public boolean inDangerZone(int x, int y, int z, int start_index,
                               int end_index, int thread_id, int[] mutexID) {
     if (thread_id != 0 && thread_id != N_THREADS - 1) {
       if (x <= start_index + 1) {
@@ -119,7 +119,7 @@ public class tumorPOOParalelo implements Runnable {
       }
     }
   }
-  static List<int[]> getEmptyNeighbors(int i, int j, int k) {
+  public List<int[]> getEmptyNeighbors(int i, int j, int k) {
     List<int[]> neighbors = new ArrayList<>();
     for (int x = -1; x <= 1; ++x) {
       for (int y = -1; y <= 1; ++y) {
@@ -136,43 +136,52 @@ public class tumorPOOParalelo implements Runnable {
     }
     return neighbors;
   }
-  static void leaveDangerZone(int thread_id, int[] mutexID) {
+  public void leaveDangerZone(int thread_id, int[] mutexID) {
     if (mutexID[0] != -1) {
       dangerZoneLocks.get(mutexID[0]).lock();
-      threadCoorsInDangerZone.get(mutexID[0])[mutexID[0] == thread_id ? 0 : 1] =
-          new int[] {-1, -1, -1};
-      dangerZoneLocks.get(mutexID[0]).unlock();
+        try {
+            threadCoorsInDangerZone.get(mutexID[0])[mutexID[0] == thread_id ? 0 : 1] =
+                    new int[] {-1, -1, -1};
+        } finally {
+            dangerZoneLocks.get(mutexID[0]).unlock();
+        }
     }
   }
-  static void updateStemCells(int thread_id, int start_index, int end_index,
+  public void updateStemCells(int thread_id, int start_index, int end_index,
                               Cell cell) {
     int[] mutexID = {-1};
     if (inDangerZone(cell.x, cell.y, cell.z, start_index, end_index, thread_id,
                      mutexID)) {
-      threadCells.get(thread_id).add(cell);
+      threadCells.get(thread_id).addFirst(cell);
       return;
     }
     List<int[]> neighbors = getEmptyNeighbors(cell.x, cell.y, cell.z);
     if (!neighbors.isEmpty()) {
       int[] newCellPosition =
-          neighbors.get(new Random().nextInt(neighbors.size()));
-      double fate = new Random().nextDouble();
+          neighbors.get(random.nextInt(neighbors.size()));
+      double fate = random.nextDouble();
       if (fate < pd) {
-        fate = new Random().nextDouble();
+        fate = random.nextDouble();
         if (fate <= ps) {
           grid[newCellPosition[0]][newCellPosition[1]][newCellPosition[2]] =
               true;
           int vectorIndex =
               Math.min(newCellPosition[0] / cellSize, N_THREADS - 1);
           threadCellsLocks.get(vectorIndex).lock();
-          threadTempCells.get(vectorIndex)
-              .add(new Cell(newCellPosition[0], newCellPosition[1],
-                            newCellPosition[2], true, rhomax));
-          threadCellsLocks.get(vectorIndex).unlock();
+            try {
+                threadTempCells.get(vectorIndex)
+                        .add(new Cell(newCellPosition[0], newCellPosition[1],
+                                newCellPosition[2], true, rhomax));
+            } finally {
+                threadCellsLocks.get(vectorIndex).unlock();
+            }
           threadCellsLocks.get(thread_id).lock();
-          threadTempCells.get(thread_id).add(
-              new Cell(cell.x, cell.y, cell.z, true, cell.ro));
-          threadCellsLocks.get(thread_id).unlock();
+            try {
+                threadTempCells.get(thread_id).add(
+                        new Cell(cell.x, cell.y, cell.z, true, cell.ro));
+            } finally {
+                threadCellsLocks.get(thread_id).unlock();
+            }
           stemcellsAlive.getAndIncrement();
           cellsAlive.getAndIncrement();
         } else {
@@ -181,40 +190,55 @@ public class tumorPOOParalelo implements Runnable {
           int vectorIndex =
               Math.min(newCellPosition[0] / cellSize, N_THREADS - 1);
           threadCellsLocks.get(vectorIndex).lock();
-          threadTempCells.get(vectorIndex)
-              .add(new Cell(newCellPosition[0], newCellPosition[1],
-                            newCellPosition[2], false, cell.ro));
-          threadCellsLocks.get(vectorIndex).unlock();
+            try {
+                threadTempCells.get(vectorIndex)
+                        .add(new Cell(newCellPosition[0], newCellPosition[1],
+                                newCellPosition[2], false, cell.ro));
+            } finally {
+                threadCellsLocks.get(vectorIndex).unlock();
+            }
           threadCellsLocks.get(thread_id).lock();
-          threadTempCells.get(thread_id).add(
-              new Cell(cell.x, cell.y, cell.z, true, cell.ro));
-          threadCellsLocks.get(thread_id).unlock();
+            try {
+                threadTempCells.get(thread_id).add(
+                        new Cell(cell.x, cell.y, cell.z, true, cell.ro));
+            } finally {
+                threadCellsLocks.get(thread_id).unlock();
+            }
           nonStemcellsAlive.getAndIncrement();
           cellsAlive.getAndIncrement();
         }
       } else if (fate < pm) {
-        int[] newCoor = neighbors.get(new Random().nextInt(neighbors.size()));
+        int[] newCoor = neighbors.get(random.nextInt(neighbors.size()));
         grid[newCoor[0]][newCoor[1]][newCoor[2]] = true;
         grid[cell.x][cell.y][cell.z] = false;
         int vectorIndex = Math.min(newCoor[0] / cellSize, N_THREADS - 1);
         threadCellsLocks.get(vectorIndex).lock();
-        threadTempCells.get(vectorIndex)
-            .add(new Cell(newCoor[0], newCoor[1], newCoor[2], true, rhomax));
-        threadCellsLocks.get(vectorIndex).unlock();
+          try {
+              threadTempCells.get(vectorIndex)
+                      .add(new Cell(newCoor[0], newCoor[1], newCoor[2], true, rhomax));
+          } finally {
+              threadCellsLocks.get(vectorIndex).unlock();
+          }
       } else {
         threadCellsLocks.get(thread_id).lock();
-        threadTempCells.get(thread_id).add(cell);
-        threadCellsLocks.get(thread_id).unlock();
+          try {
+              threadTempCells.get(thread_id).add(cell);
+          } finally {
+              threadCellsLocks.get(thread_id).unlock();
+          }
       }
     } else {
       threadCellsLocks.get(thread_id).lock();
-      threadTempCells.get(thread_id).add(cell);
-      threadCellsLocks.get(thread_id).unlock();
+        try {
+            threadTempCells.get(thread_id).add(cell);
+        } finally {
+            threadCellsLocks.get(thread_id).unlock();
+        }
     }
     leaveDangerZone(thread_id, mutexID);
   }
 
-  static void updateNonStemCells(int thread_id, int start_index, int end_index,
+  public void updateNonStemCells(int thread_id, int start_index, int end_index,
                                  Cell cell) {
     int[] mutexID = {-1};
     if (inDangerZone(cell.x, cell.y, cell.z, start_index, end_index, thread_id,
@@ -222,7 +246,7 @@ public class tumorPOOParalelo implements Runnable {
       threadCells.get(thread_id).add(cell);
       return;
     }
-    double fate = new Random().nextDouble();
+    double fate = random.nextDouble();
     if (fate < alpha) {
       grid[cell.x][cell.y][cell.z] = false;
       nonStemcellsAlive.getAndDecrement();
@@ -233,9 +257,9 @@ public class tumorPOOParalelo implements Runnable {
 
     List<int[]> neighbors = getEmptyNeighbors(cell.x, cell.y, cell.z);
     if (!neighbors.isEmpty()) {
-      fate = new Random().nextDouble();
+      fate = random.nextDouble();
       int[] newCellPosition =
-          neighbors.get(new Random().nextInt(neighbors.size()));
+          neighbors.get(random.nextInt(neighbors.size()));
       if (fate < pd) {
         if (cell.ro == 0) {
           grid[cell.x][cell.y][cell.z] = false;
@@ -249,43 +273,59 @@ public class tumorPOOParalelo implements Runnable {
           int vectorIndex =
               Math.min(newCellPosition[0] / cellSize, N_THREADS - 1);
           threadCellsLocks.get(vectorIndex).lock();
-          threadTempCells.get(vectorIndex).add(cell);
-          threadCellsLocks.get(vectorIndex).unlock();
+            try {
+                threadTempCells.get(vectorIndex).add(cell);
+            } finally {
+                threadCellsLocks.get(vectorIndex).unlock();
+            }
           threadCellsLocks.get(thread_id).lock();
-          threadTempCells.get(thread_id).add(
-              new Cell(newCellPosition[0], newCellPosition[1],
-                       newCellPosition[2], false, cell.ro));
-          threadCellsLocks.get(thread_id).unlock();
+            try {
+                threadTempCells.get(thread_id).add(
+                        new Cell(newCellPosition[0], newCellPosition[1],
+                                newCellPosition[2], false, cell.ro));
+            } finally {
+                threadCellsLocks.get(thread_id).unlock();
+            }
           nonStemcellsAlive.incrementAndGet();
           cellsAlive.incrementAndGet();
         }
       } else if (fate < pm) {
-        int[] newCoor = neighbors.get(new Random().nextInt(neighbors.size()));
+        int[] newCoor = neighbors.get(random.nextInt(neighbors.size()));
         grid[newCoor[0]][newCoor[1]][newCoor[2]] = true;
         grid[cell.x][cell.y][cell.z] = false;
         int vectorIndex = Math.min(newCoor[0] / cellSize, N_THREADS - 1);
         threadCellsLocks.get(vectorIndex).lock();
-        threadTempCells.get(vectorIndex)
-            .add(new Cell(newCoor[0], newCoor[1], newCoor[2], false, cell.ro));
-        threadCellsLocks.get(vectorIndex).unlock();
+          try {
+              threadTempCells.get(vectorIndex)
+                      .add(new Cell(newCoor[0], newCoor[1], newCoor[2], false, cell.ro));
+          } finally {
+              threadCellsLocks.get(vectorIndex).unlock();
+          }
       } else {
         threadCellsLocks.get(thread_id).lock();
-        threadTempCells.get(thread_id).add(cell);
-        threadCellsLocks.get(thread_id).unlock();
+          try {
+              threadTempCells.get(thread_id).add(cell);
+          } finally {
+              threadCellsLocks.get(thread_id).unlock();
+          }
       }
     } else {
       threadCellsLocks.get(thread_id).lock();
-      threadTempCells.get(thread_id).add(cell);
-      threadCellsLocks.get(thread_id).unlock();
+        try {
+            threadTempCells.get(thread_id).add(cell);
+        } finally {
+            threadCellsLocks.get(thread_id).unlock();
+        }
     }
     leaveDangerZone(thread_id, mutexID);
   }
 
-  static void updateState(int thread_id, int start_index, int end_index) {
+  public void updateState(int thread_id, int start_index, int end_index) {
     List<Cell> cells = threadCells.get(thread_id);
     while (!cells.isEmpty()) {
-      int index = new Random().nextInt(cells.size());
-      Cell cell = cells.remove(index);
+      int index = random.nextInt(cells.size());
+      Collections.swap(cells, index, cells.size()-1);
+      Cell cell = cells.removeLast();
       if (cell.isStemCell) {
         updateStemCells(thread_id, start_index, end_index, cell);
       } else {
@@ -293,26 +333,21 @@ public class tumorPOOParalelo implements Runnable {
       }
     }
   }
-  static void parallel_simulation(int thread_id, int start_index,
+  public void parallel_simulation(int thread_id, int start_index,
                                   int end_index) {
-    if (thread_id == 0) {
-      startTime = Instant.now();
-    }
     for (int step = 1; step <= nSteps; step++) {
       updateState(thread_id, start_index, end_index);
       try {
         barrier.await();
       } catch (InterruptedException | BrokenBarrierException e) {
-        e.printStackTrace();
       }
       if (thread_id == 0 && step % 24 == 0) {
-        endTime = Instant.now();
-        ElapsedTime += Duration.between(startTime, endTime).toMillis() / 1000;
+        Instant elapsedTime = Instant.now();
         System.out.println("Day: " + (step / 24));
         System.out.println("cellsAlive: " + cellsAlive);
         System.out.println("stemcellsAlive: " + stemcellsAlive);
         System.out.println("nonStemcellsAlive: " + nonStemcellsAlive);
-        startTime = Instant.now();
+        System.out.println("Elapsed time:"+ Duration.between(startTime, elapsedTime).toMillis() / 1000);
       }
       threadCells.get(thread_id).clear();
       threadCells.set(thread_id,
@@ -321,7 +356,6 @@ public class tumorPOOParalelo implements Runnable {
       try {
         barrier.await();
       } catch (InterruptedException | BrokenBarrierException e) {
-        e.printStackTrace();
       }
     }
   }
@@ -333,7 +367,7 @@ public class tumorPOOParalelo implements Runnable {
     String filename = "simdata" + N_THREADS + "threads" + gridSize + "grid" +
                       nDays + "days.txt";
     try (FileWriter file = new FileWriter(filename, true)) {
-      file.write(cellsAlive + ":" + ElapsedTime + "\n");
+      file.write(cellsAlive + ":" + runTime + "\n");
     } catch (IOException e) {
       System.err.println("Error opening file for appending data.");
     }
@@ -372,15 +406,16 @@ public class tumorPOOParalelo implements Runnable {
     stemcellsAlive.set(1);
     cellsAlive.set(1);
     // Crear y arrancar los threads
+    startTime = Instant.now();
     for (int i = 0; i < N_THREADS; i++) {
       if (i == N_THREADS - 1) {
         Thread thread = new Thread(
-            new tumorPOOParalelo(i, i * (gridSize / N_THREADS), gridSize - 1));
+            new tumorPOOParaleloV2(i, i * (gridSize / N_THREADS), gridSize - 1));
         threads.add(thread);
         thread.start();
       } else {
         Thread thread = new Thread(
-            new tumorPOOParalelo(i, i * (gridSize / N_THREADS),
+            new tumorPOOParaleloV2(i, i * (gridSize / N_THREADS),
                                  (i + 1) * (gridSize / N_THREADS) - 1));
         threads.add(thread);
         thread.start();
@@ -392,14 +427,15 @@ public class tumorPOOParalelo implements Runnable {
       try {
         thread.join();
       } catch (InterruptedException e) {
-        e.printStackTrace();
       }
     }
+    endTime = Instant.now();
+    runTime = Duration.between(startTime, endTime).toMillis() / 1000;
     appendSimulationData();
     System.out.println("Simulation completed.");
     System.out.println("Total cells alive: " + cellsAlive);
     System.out.println("Total stem cells alive: " + stemcellsAlive);
     System.out.println("Total non-stem cells alive: " + nonStemcellsAlive);
-    // verifyCellCount();
+    verifyCellCount();
   }
 }

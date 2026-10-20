@@ -12,11 +12,11 @@ public class MasterScriptv02 : MonoBehaviour
     public event System.Action<bool> OnPause;
 
     public Dictionary<string, float> sc_traitvector = new Dictionary<string, float> {
-        { "cct", 24 }, { "rho_max", 10 }, { "mu", 100 }, { "alpha", 0 }
+        { "cct", 24 }, { "rho_max", 9 }, { "mu", 100 }, { "alpha", 0 }
     };
 
     public Dictionary<string, float> nsc_traitvector = new Dictionary<string, float> {
-        { "cct", 24 }, { "rho_max", 10 }, { "mu", 100 }, { "alpha", 0.01f }
+        { "cct", 24 }, { "rho_max", 9 }, { "mu", 100 }, { "alpha", 0.01f }
     };
 
     private float inct;
@@ -48,11 +48,13 @@ public class MasterScriptv02 : MonoBehaviour
 
     [Header("Indirect voxel rendering")]
     public Material voxelMaterial;
-    public float voxelScale = 0.95f;
+    public float voxelScale = 1.5f;
 
     private Mesh voxelMesh;
-    private ComputeBuffer voxelBuffer;
-    private ComputeBuffer argsBuffer;
+    private GraphicsBuffer voxelBuffer;
+    private GraphicsBuffer argsBuffer;
+
+    private GraphicsBuffer.IndirectDrawIndexedArgs[] indirectArgs = new GraphicsBuffer.IndirectDrawIndexedArgs[1];
     private Bounds drawBounds;
 
     private struct VoxelRenderData
@@ -103,9 +105,9 @@ public class MasterScriptv02 : MonoBehaviour
 
     private void SetupVoxelRenderer()
     {
-        GameObject sphere = GameObject.CreatePrimitive(PrimitiveType.Sphere);
-        voxelMesh = sphere.GetComponent<MeshFilter>().sharedMesh;
-        Destroy(sphere);
+        GameObject cube = GameObject.CreatePrimitive(PrimitiveType.Cube);
+        voxelMesh = cube.GetComponent<MeshFilter>().sharedMesh;
+        Destroy(cube);
 
         if (voxelMaterial != null)
             voxelMaterial.enableInstancing = true;
@@ -124,7 +126,7 @@ public class MasterScriptv02 : MonoBehaviour
 
     private void LateUpdate()
     {
-        if(Input.GetKey("escape") && !isSimulating)
+        if (Input.GetKey("escape") && !isSimulating)
         {
             UnityEngine.SceneManagement.SceneManager.LoadScene(0);
         }
@@ -143,23 +145,22 @@ public class MasterScriptv02 : MonoBehaviour
 
     private IEnumerator Simulate()
     {
-        int chunkSize = 10;
 
         while (isSimulating && step <= nSteps)
         {
             int totalCells = cells.Count;
-            for (int i = 0; i < totalCells; i += chunkSize)
+            for (int i = 0; i < totalCells; i++)
             {
-                int end = Mathf.Min(i + chunkSize, totalCells);
-                for (int j = i; j < end; j++)
+                Cell cell = cells[i];
+                if (cell.isStemCell)
                 {
-                    Cell cell = cells[j];
-                    if (cell.isStemCell)
-                        Update_scells(cell);
-                    else
-                        Update_nscells(cell);
+                    Update_scells(cell);
                 }
-                yield return null;
+
+                else
+                {
+                    Update_nscells(cell);
+                }
             }
 
             (tempCells, cells) = (cells, tempCells);
@@ -171,8 +172,8 @@ public class MasterScriptv02 : MonoBehaviour
 
             //if (step % 24 == 0)
             //{
-                int day = (step / 24) + 1;
-                OnDayChanged?.Invoke(day, CellsAlive, StemCellsAlive, NonStemCellsAlive);
+            int day = (step / 24) + 1;
+            OnDayChanged?.Invoke(day, CellsAlive, StemCellsAlive, NonStemCellsAlive);
             //}
 
             step++;
@@ -200,31 +201,57 @@ public class MasterScriptv02 : MonoBehaviour
                 float normalizedValue = clampedValue / rhoMax;
 
                 color = normalizedValue < 0.5f
-                    ? Color.Lerp(Color.black, Color.white, normalizedValue * 2f)
-                    : Color.Lerp(Color.white, Color.red, (normalizedValue - 0.5f) * 2f);
+                    ? Color.Lerp(new Color32(3, 39, 102, 255),      // Azul
+            new Color32(235, 240, 248, 255),    // Blanco azulado
+            normalizedValue * 2f)
+                    : Color.Lerp(
+                        new Color32(235, 240, 248, 255),    // Blanco azulado
+            new Color32(164, 27, 38, 255),      // Rojo
+            (normalizedValue - 0.5f) * 2f
+                      );
             }
 
             voxelData.Add(new VoxelRenderData
             {
-                posScale = new Vector4(cell.x, cell.y, cell.z, voxelScale),
+                posScale = new Vector4(
+                    cell.x,
+                    cell.y,
+                    cell.z,
+                    voxelScale
+                ),
                 color = color
             });
         }
 
-        if (voxelData.Count == 0 || voxelMaterial == null || voxelMesh == null)
+        if (voxelData.Count == 0 ||
+            voxelMaterial == null ||
+            voxelMesh == null)
+        {
             return;
+        }
 
         EnsureBuffers(voxelData.Count);
 
+        // Subir los datos de las células a GPU
         voxelBuffer.SetData(voxelData);
 
-        args[0] = voxelMesh.GetIndexCount(0);
-        args[1] = (uint)voxelData.Count;
-        args[2] = voxelMesh.GetIndexStart(0);
-        args[3] = voxelMesh.GetBaseVertex(0);
-        args[4] = 0;
+        // Configurar los argumentos del renderizado indirecto
+        indirectArgs[0].indexCountPerInstance =
+            voxelMesh.GetIndexCount(0);
 
-        argsBuffer.SetData(args);
+        indirectArgs[0].instanceCount =
+            (uint)voxelData.Count;
+
+        indirectArgs[0].startIndex =
+            voxelMesh.GetIndexStart(0);
+
+        indirectArgs[0].baseVertexIndex =
+            voxelMesh.GetBaseVertex(0);
+
+        indirectArgs[0].startInstance = 0;
+
+        argsBuffer.SetData(indirectArgs);
+
         voxelMaterial.SetBuffer("_VoxelBuffer", voxelBuffer);
     }
 
@@ -235,26 +262,43 @@ public class MasterScriptv02 : MonoBehaviour
         if (voxelBuffer == null || voxelBuffer.count < count)
         {
             ReleaseVoxelBuffer();
-            voxelBuffer = new ComputeBuffer(count, stride);
+
+            voxelBuffer = new GraphicsBuffer(
+                GraphicsBuffer.Target.Structured,
+                count,
+                stride
+            );
         }
 
         if (argsBuffer == null)
         {
-            argsBuffer = new ComputeBuffer(1, args.Length * sizeof(uint), ComputeBufferType.IndirectArguments);
+            argsBuffer = new GraphicsBuffer(
+                GraphicsBuffer.Target.IndirectArguments,
+                1,
+                GraphicsBuffer.IndirectDrawIndexedArgs.size
+            );
         }
     }
 
     private void DrawVoxels()
     {
-        if (voxelMaterial == null || voxelMesh == null || argsBuffer == null || voxelData.Count == 0)
+        if (voxelMaterial == null ||
+            voxelMesh == null ||
+            argsBuffer == null ||
+            voxelData.Count == 0)
+        {
             return;
+        }
 
-        Graphics.DrawMeshInstancedIndirect(
+        RenderParams rp = new RenderParams(voxelMaterial);
+        rp.worldBounds = drawBounds;
+
+        Graphics.RenderMeshIndirect(
+            rp,
             voxelMesh,
-            0,
-            voxelMaterial,
-            drawBounds,
-            argsBuffer
+            argsBuffer,
+            1,
+            0
         );
     }
 
@@ -372,16 +416,16 @@ public class MasterScriptv02 : MonoBehaviour
             }
             else
                 if (fate < pm)
-            {
-                grid[newcell_position.x, newcell_position.y, newcell_position.z] = grid[cell.x, cell.y, cell.z];
-                grid[cell.x, cell.y, cell.z] = false;
-                tempCells.Add(new Cell(newcell_position.x, newcell_position.y, newcell_position.z, false, cell.ro));
+                {
+                    grid[newcell_position.x, newcell_position.y, newcell_position.z] = grid[cell.x, cell.y, cell.z];
+                    grid[cell.x, cell.y, cell.z] = false;
+                    tempCells.Add(new Cell(newcell_position.x, newcell_position.y, newcell_position.z, false, cell.ro));
 
-            }
-            else
-            {
-                tempCells.Add(new Cell(cell));
-            }
+                }
+                else
+                {
+                    tempCells.Add(new Cell(cell));
+                }
 
 
         }

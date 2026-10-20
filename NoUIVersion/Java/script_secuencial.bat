@@ -1,10 +1,10 @@
 @echo off
-javac tumorPOOV2.java
+javac SimulacionTumoral.java
 echo Iniciando simulaciones secuenciales...
 
 for /L %%i in (1,1,10) do (
     echo Ejecutando simulación %%i...
-    java tumorPOOV2
+    java SimulacionTumoral
     echo Simulación %%i finalizada.
 )
 
