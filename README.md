@@ -63,7 +63,7 @@ En esta carpeta se encuentran las versiones **secuencial** y **paralela** del al
 Abre una terminal en la carpeta correspondiente y ejecuta:
 
 ```bash
-g++ TumorPOOV2.cpp -o NombreEjecutable -std=c++20
+g++ SimulacionTumoral.cpp -o NombreEjecutable -std=c++20
 ```
 
 ##### Versión paralela
@@ -71,7 +71,7 @@ g++ TumorPOOV2.cpp -o NombreEjecutable -std=c++20
 Para compilar la versión paralela:
 
 ```bash
-g++ TumorPOOV2Paralelo.cpp -o NombreEjecutable -std=c++20
+g++ SimulacionTumoralParalela.cpp -o NombreEjecutable -std=c++20
 ```
 
 #### Ejecución
@@ -119,13 +119,13 @@ Esta carpeta contiene las versiones **secuencial** y **paralela** del algoritmo.
 ##### Versión secuencial
 
 ```bash
-javac tumorPOOV2.java
+javac SimulacionTumoral.java
 ```
 
 ##### Versión paralela
 
 ```bash
-javac tumorPOOParaleloV2.java
+javac SimulacionTumoralParalela.java
 ```
 
 #### Ejecución
@@ -133,13 +133,13 @@ javac tumorPOOParaleloV2.java
 ##### Versión secuencial
 
 ```bash
-java tumorPOOV2
+java SimulacionTumoral
 ```
 
 ##### Versión paralela
 
 ```bash
-java tumorPOOParaleloV2 numeroDeHilos
+java SimulacionTumoralParalela numeroDeHilos
 ```
 
 En la versión paralela se deberá indicar el número de hilos que se utilizarán para ejecutar la simulación.
