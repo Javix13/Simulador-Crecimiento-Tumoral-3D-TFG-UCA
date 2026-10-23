@@ -229,6 +229,8 @@ El simulador permite mover y rotar la cámara para observar el crecimiento tumor
 | `Q`   | Rota la cámara hacia la izquierda y cambia su posición |
 | `E`   | Rota la cámara hacia la derecha y cambia su posición   |
 
+También podemos usar la rueda del ratón para acercar y alejar la cámara.
+
 ### Pausar la simulación
 
 Es posible pausar la simulación pulsando la tecla:
