@@ -40,7 +40,14 @@ const double alpha = 0.01;
 std::default_random_engine generator(std::time(0));
 std::uniform_real_distribution<double> distribution(0.0, 1.0);
 
-// Función para obtener vecinos vacíos
+/**
+ * @brief Obtiene los vecinos vacios de una célula siguiendo la vecindad de Moore
+ *
+ * @param x Coordenada X de la célula
+ * @param y Coordenada Y de la célula
+ * @param z Coordenada Z de la célula
+ * @return Lista de coordenadas de vecinos vacios
+ */
 std::vector<std::array<int, 3>> getEmptyNeighbors(int i, int j, int k) {
   std::vector<std::array<int, 3>> neighbors;
 
@@ -61,7 +68,12 @@ std::vector<std::array<int, 3>> getEmptyNeighbors(int i, int j, int k) {
   return neighbors;
 }
 
-// Función para actualizar células madre
+/**
+ * @brief Actualiza el estado de una célula madre
+ * siguiendo la función de transición descrita en 2.5.4 del documento del TFG
+ *
+ * @param cell célula madre a procesar
+ */
 void updateStemCells(Cell cell) {
   auto neighbors = getEmptyNeighbors(cell.x, cell.y, cell.z);
 
@@ -101,7 +113,12 @@ void updateStemCells(Cell cell) {
   }
 }
 
-// Función para actualizar células no madre
+/**
+ * @brief Actualiza el estado de una célula no madre
+ * siguiendo la función de transición descrita en 2.5.4 del documento del TFG
+ *
+ * @param cell célula no madre a procesar
+ */
 void updateNonStemCells(Cell cell) {
   double fate = distribution(generator);
   if (fate < alpha) {
@@ -146,7 +163,12 @@ void updateNonStemCells(Cell cell) {
   }
 }
 
-// Función para actualizar el estado general
+/**
+ * @brief Actualiza el estado actual del automáta celular
+ *
+ * La función itera por cada célula actual del autómata celular escogiendo una célula al azar del vector
+ * y la procesa según su tipo
+ */
 void updateState() {
   while(!cells.empty()){
     unsigned index = rand() % cells.size();
@@ -161,10 +183,18 @@ void updateState() {
   }
 }
 
-// Función para simular
+/**
+ * @brief Ejecuta la simulación del crecimiento tumoral.
+ *
+ * La función itera durante el número total de pasos de simulación, actualizando
+ * el estado de las células en cada paso. Al finalizar cada día,
+ * muestra por consola el día simulado, el número de células vivas
+ * y el tiempo transcurrido desde el inicio de la simulación.
+ *
+ * Tras cada actualización, intercambia el estado actual con el
+ * temporal y limpia el contenedor temporal para el siguiente paso.
+ */
 void simulate() {
-  std::chrono::duration<double> elapsed_seconds;
-
   for (int step = 1; step <= nSteps; ++step) {
     updateState();
     if (step % 24 == 0) {
@@ -179,6 +209,20 @@ void simulate() {
     tempCells.clear();
   }
 }
+
+/**
+ * @brief Guarda los datos de la simulación en un archivo de texto.
+ *
+ * Abre el archivo de resultados en modo de anexado y escribe el número
+ * de células vivas y el tiempo de ejecución, separados por dos puntos.
+ * El nombre del archivo se genera a partir del tamaño de la matriz
+ * y del número de días de simulación.
+ *
+ * Si el archivo no puede abrirse, muestra un mensaje de error por consola.
+ *
+ * @note Cada registro se añade en una línea nueva, conservando los datos
+ *       almacenados previamente en el archivo.
+ */
 void appendSimulationData() {
   std::ofstream file("simdata1threads" + std::to_string(gridSize) + "grid" +
                          std::to_string(nDays) + "days.txt",
@@ -191,6 +235,20 @@ void appendSimulationData() {
   }
 }
 
+
+/**
+ * @brief Inicializa y ejecuta la simulación del crecimiento tumoral.
+ *
+ * Inicializa una célula madre en el centro de la cuadrícula tridimensional
+ * y establece los contadores iniciales de células vivas. A continuación,
+ * registra el instante de inicio, ejecuta la simulación y calcula el tiempo
+ * total de ejecución.
+ *
+ * Finalmente, muestra por consola el tiempo total empleado y guarda los
+ * resultados de la simulación en un archivo mediante appendSimulationData().
+ *
+ * @return 0 si la ejecución finaliza correctamente.
+ */
 int main() {
   grid[gridSize / 2][gridSize / 2][gridSize / 2] = true;
   cells.emplace_back(gridSize / 2, gridSize / 2, gridSize / 2, true, rhomax);

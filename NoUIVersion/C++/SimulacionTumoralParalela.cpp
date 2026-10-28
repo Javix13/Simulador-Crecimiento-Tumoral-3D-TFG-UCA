@@ -29,13 +29,6 @@ const int nDays = 120;
 const int nSteps = 24 * nDays;
 const int min_cells = 0, max_cells = 0;
 const int gridSize = 500;
-
-std::vector<std::thread> threads;
-std::vector<std::array<std::array<int, 3>, 2>> threadCoorsInDangerZone;
-
-std::vector<std::unique_ptr<std::mutex>> threadDangerZoneMutexes;
-std::vector<std::unique_ptr<std::mutex>> threadCellsMutexes;
-
 int cellSize = gridSize / N_THREADS;
 bool grid[gridSize][gridSize][gridSize] = {{{false}}};
 std::vector<std::vector<Cell>> threadCells;
@@ -43,10 +36,19 @@ std::vector<std::vector<Cell>> threadTempCells;
 double runTime = 0;
 std::chrono::time_point<std::chrono::high_resolution_clock> start, end;
 
+// Variables globales para la concurrencia
+std::vector<std::thread> threads;
+std::vector<std::array<std::array<int, 3>, 2>> threadCoorsInDangerZone;
+
+std::vector<std::unique_ptr<std::mutex>> threadDangerZoneMutexes;
+std::vector<std::unique_ptr<std::mutex>> threadCellsMutexes;
 std::atomic<int> stemcellsAlive = 0;
 std::atomic<int> nonStemcellsAlive = 0;
 std::atomic<int> cellsAlive = 0;
-std::map<int, int> emptyNeighboursHist;
+std::barrier<> *barrier;
+
+
+
 
 // Parámetros de simulación
 const double pd = 1.0 / 24.0 * 1.30;
@@ -55,14 +57,23 @@ const double ps = 0.1;
 const int rhomax = 10;
 const double alpha = 0.01;
 
-std::barrier<> *barrier;
-
-void countCellsInGrid() {
+/**
+ * @brief cuenta el número de células en la matriz
+ * Función que se encarga de contar y comparar el número de células de la matriz con el número de células vivas
+ * con el fin de comprobar que no ha habido problemas de concurrencia que hayan derivado a condiciones de carrera que produzcan
+ * una desincronización en el conteo.
+ */
+void countCellsInGrid() 
+{
   int count = 0;
-  for (int i = 0; i < gridSize; ++i) {
-    for (int j = 0; j < gridSize; ++j) {
-      for (int k = 0; k < gridSize; ++k) {
-        if (grid[i][j][k]) {
+  for (int i = 0; i < gridSize; ++i) 
+  {
+    for (int j = 0; j < gridSize; ++j) 
+    {
+      for (int k = 0; k < gridSize; ++k) 
+      {
+        if (grid[i][j][k]) 
+        {
           ++count;
         }
       }
@@ -78,7 +89,11 @@ void countCellsInGrid() {
     system("pause");
   }
 }
-
+/**
+ * @brief Protocolo de salida de la zona de peligro
+ * @param thread_id id del hilo actual
+ * @param mutexID id del mutex utilizado
+ */
 void leaveDangerZone(int thread_id, int mutexID) {
   if (mutexID != -1) {
     threadDangerZoneMutexes[mutexID]->lock();
@@ -88,6 +103,18 @@ void leaveDangerZone(int thread_id, int mutexID) {
   }
 }
 
+/**
+ * @brief Protocolo de entrada a la zona de peligro
+ * El funcionamiento del protocolo está desrito en las secciones 2.6 y 5.4 del documento del TFG
+ * @param x posición X de la célula
+ * @param y posición y de la célula
+ * @param z posición z de la célula
+ * @param start_index indice inicial de la zona de trabajo del hilo
+ * @param end_index indice final de la zona de trabajo del hilo
+ * @param thread_id id del hilo actual
+ * @param mutexID párametro de entrada y salida para guardar el id del mutex usado por el hilo actual
+ * @return El hilo actual se encuentra próximo a su vecino
+ */
 bool InDangerZone(int x, int y, int z, int start_index, int end_index,
                   int thread_id, int *mutexID) {
   if (thread_id != 0 && thread_id != N_THREADS - 1) {
@@ -162,6 +189,14 @@ bool InDangerZone(int x, int y, int z, int start_index, int end_index,
   }
 }
 
+/**
+ * @brief Obtiene los vecinos vacios de una célula siguiendo la vecindad de Moore
+ *
+ * @param x Coordenada X de la célula
+ * @param y Coordenada Y de la célula
+ * @param z Coordenada Z de la célula
+ * @return Lista de coordenadas de vecinos vacios
+ */
 std::vector<std::array<int, 3>> getEmptyNeighbors(int i, int j, int k) {
   std::vector<std::array<int, 3>> neighbors;
 
@@ -182,6 +217,17 @@ std::vector<std::array<int, 3>> getEmptyNeighbors(int i, int j, int k) {
   return neighbors;
 }
 
+/**
+ * @brief Actualiza el estado de una célula madre
+ * Sigue la función de transición descrita en 2.5.4 del documento del TFG y el protocolo de exclusión mutua
+ * 
+ * @param thread_id id del hilo actual
+ * @param start_index indice inicial de la zona de trabajo del hilo
+ * @param end_index indice final de la zona de trabajo del hilo
+ * @param cell célula madre a procesar
+ * @param generator generador de números aleatorios común a todos los hilos
+ * @param distribution distribución utilizada para generar los números aleatorios
+ */
 void updateStemCells(int thread_id, int start_index, int end_index, Cell cell,
                      std::default_random_engine &generator,
                      std::uniform_real_distribution<double> &distribution) {
@@ -262,6 +308,19 @@ void updateStemCells(int thread_id, int start_index, int end_index, Cell cell,
   leaveDangerZone(thread_id, mutexID);
 }
 
+
+
+/**
+ * @brief Actualiza el estado de una célula no madre
+ * siguiendo la función de transición descrita en 2.5.4 del documento del TFG y el protocolo de exclusión mutua
+ *
+ * @param thread_id id del hilo actual
+ * @param start_index indice inicial de la zona de trabajo del hilo
+ * @param end_index indice final de la zona de trabajo del hilo
+ * @param cell célula madre a procesar
+ * @param generator generador de números aleatorios común a todos los hilos
+ * @param distribution distribución utilizada para generar los números aleatorios
+ */
 void updateNonStemCells(int thread_id, int start_index, int end_index,
                         Cell cell, std::default_random_engine &generator,
                         std::uniform_real_distribution<double> &distribution) {
@@ -334,6 +393,17 @@ void updateNonStemCells(int thread_id, int start_index, int end_index,
   leaveDangerZone(thread_id, mutexID);
 }
 
+
+/**
+ * @brief Actualiza el estado del autómata celular en el hilo actual
+ *  
+ * @param thread_id id del hilo actual
+ * @param start_index indice inicial de la zona de trabajo del hilo
+ * @param end_index indice final de la zona de trabajo del hilo
+ * @param cell célula madre a procesar
+ * @param generator generador de números aleatorios común a todos los hilos
+ * @param distribution distribución utilizada para generar los números aleatorios
+ */
 void updateState(int thread_id, int start_index, int end_index,
                  std::default_random_engine &generator,
                  std::uniform_real_distribution<double> &distribution) {
@@ -351,6 +421,18 @@ void updateState(int thread_id, int start_index, int end_index,
                          distribution);
     }
 }}
+
+/**
+ * @brief Ejecuta la simulación paralela del crecimiento tumoral.
+ * Cada hilo itera durante el número total de pasos de simulación, actualizando
+ * el estado de las células en cada paso. Cuando todos los hilos terminan de procesar
+ * su parte, el hilo 0 muestra por pantalla el estado actual de la simulación y
+ * tras cada actualización cada hilo intercambia el estado actual con el
+ * temporal y limpia el contenedor temporal para el siguiente paso.
+ * @param thread_id id del hilo actual
+ * @param start_index indice inicial de la zona de trabajo del hilo
+ * @param end_index indice final de la zona de trabajo del hilo
+ */
 
 void parallel_simulation(int thread_id, int start_index, int end_index) {
   std::default_random_engine generator(time(0));
@@ -372,6 +454,11 @@ void parallel_simulation(int thread_id, int start_index, int end_index) {
   }
 }
 
+
+/**
+ * @brief Verifica que el número de células totales coincide con la suma de las células almacenadas en los vectores
+ * de trabajo de cada hilo y lo muestra por pantalla.
+ */
 void verifyCellCount() {
   int totalCells = 0;
   int thread = 0;
@@ -390,6 +477,19 @@ void verifyCellCount() {
   }
 }
 
+/**
+ * @brief Guarda los datos de la simulación en un archivo de texto.
+ *
+ * Abre el archivo de resultados en modo de anexado y escribe el número
+ * de células vivas y el tiempo de ejecución, separados por dos puntos.
+ * El nombre del archivo se genera a partir del número de hilos, tamaño de la matriz
+ * y del número de días de simulación.
+ *
+ * Si el archivo no puede abrirse, muestra un mensaje de error por consola.
+ *
+ * @note Cada registro se añade en una línea nueva, conservando los datos
+ *       almacenados previamente en el archivo.
+ */
 void appendSimulationData() {
   std::ofstream file("simdata" + std::to_string(N_THREADS) + "threads" +
                          std::to_string(gridSize) + "grid" +
@@ -403,6 +503,10 @@ void appendSimulationData() {
   }
 }
 
+
+/**
+ * @brief Inicializa las variables globales utilizadas en el algoritmo
+ */
 void initializeGlobals() {
 
   // Redimensionar los vectores según el número de hilos
@@ -427,6 +531,33 @@ void initializeGlobals() {
   barrier = new std::barrier<>(N_THREADS);
 }
 
+
+/**
+ * @brief Inicializa y ejecuta la simulación paralela del crecimiento tumoral.
+ *
+ * Configura las variables globales y coloca la célula madre inicial en el
+ * centro de la cuadrícula tridimensional, asignándola al vector de células
+ * del hilo correspondiente.
+ *
+ * Crea los hilos de ejecución y distribuye entre ellos los intervalos de
+ * coordenadas del eje X de la cuadrícula. Cada hilo ejecuta la función
+ * parallel_simulation() sobre su región asignada.
+ *
+ * Espera a que todos los hilos finalicen y calcula el tiempo total de
+ * ejecución. A continuación, muestra las estadísticas de células vivas,
+ * comprueba la consistencia del recuento de células y libera la barrera
+ * de sincronización.
+ *
+ * Si el número de células vivas no cumple los límites establecidos por
+ * min_cells y max_cells, descarta los resultados y finaliza el programa.
+ * En caso contrario, guarda los resultados mediante appendSimulationData().
+ *
+ * @param argc Número de argumentos recibidos por línea de comandos.
+ * @param argv Array de argumentos recibidos por línea de comandos.
+ *             El segundo argumento (argv[2]) especifica el número de hilos.
+ *
+ * @return 0 al finalizar la ejecución.
+ */
 int main(int argc, char *argv[]) {
   if (argc > 1) {
     std::cout << "Number of threads: " << argv[2] << "\n";

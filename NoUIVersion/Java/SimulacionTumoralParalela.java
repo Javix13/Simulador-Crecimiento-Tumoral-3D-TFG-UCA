@@ -7,20 +7,23 @@ import java.util.concurrent.*;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.locks.ReentrantLock;
 
-public class tumorPOOParaleloV2 implements Runnable {
+public class SimulacionTumoralParalela implements Runnable {
   int thread_id;
   int start_index;
   int end_index;
-  tumorPOOParaleloV2(int thread_id, int start_index, int end_index) {
+  SimulacionTumoralParalela(int thread_id, int start_index, int end_index) {
     this.thread_id = thread_id;
     this.start_index = start_index;
     this.end_index = end_index;
   }
-
+  //Variables globales
+  static final int gridSize = 500;
+  static boolean[][][] grid = new boolean[gridSize][gridSize][gridSize];
+  static int cellSize;
   static int N_THREADS;
   static final int nDays = 80;
+  // Párametros globales de la simulación
   static final int nSteps = 24 * nDays;
-  static final int gridSize = 500;
   static final double pd = 1.0 / 24.0 * 1.30;
   static final double pm = 10.0 / 24.0;
   static final double ps = 0.1;
@@ -28,8 +31,7 @@ public class tumorPOOParaleloV2 implements Runnable {
   static final double alpha = 0.01;
   static Instant startTime, endTime;
 
-  static boolean[][][] grid = new boolean[gridSize][gridSize][gridSize];
-  static int cellSize;
+  // Variables globales para la concurrencia
   static List<Thread> threads = new ArrayList<>();
   static List<List<Cell>> threadCells = new ArrayList<>();
   static List<List<Cell>> threadTempCells = new ArrayList<>();
@@ -45,6 +47,19 @@ public class tumorPOOParaleloV2 implements Runnable {
   static CyclicBarrier barrier;
   static double runTime = 0;
   public Random random = new Random();
+
+/**
+ * Protocolo de entrada a la zona de peligro
+ * El funcionamiento del protocolo está desrito en las secciones 2.6 y 5.4 del documento del TFG
+ * @param x posición X de la célula
+ * @param y posición y de la célula
+ * @param z posición z de la célula
+ * @param start_index indice inicial de la zona de trabajo del hilo
+ * @param end_index indice final de la zona de trabajo del hilo
+ * @param thread_id id del hilo actual
+ * @param mutexID párametro de entrada y salida para guardar el id del mutex usado por el hilo actual
+ * @return El hilo actual se encuentra próximo a su vecino
+ */
   public boolean inDangerZone(int x, int y, int z, int start_index,
                               int end_index, int thread_id, int[] mutexID) {
     if (thread_id != 0 && thread_id != N_THREADS - 1) {
@@ -119,6 +134,14 @@ public class tumorPOOParaleloV2 implements Runnable {
       }
     }
   }
+  /**
+ * Obtiene los vecinos vacios de una célula siguiendo la vecindad de Moore
+ *
+ * @param x Coordenada X de la célula
+ * @param y Coordenada Y de la célula
+ * @param z Coordenada Z de la célula
+ * @return Lista de coordenadas de vecinos vacios
+ */
   public List<int[]> getEmptyNeighbors(int i, int j, int k) {
     List<int[]> neighbors = new ArrayList<>();
     for (int x = -1; x <= 1; ++x) {
@@ -136,6 +159,12 @@ public class tumorPOOParaleloV2 implements Runnable {
     }
     return neighbors;
   }
+
+  /**
+ * Protocolo de salida de la zona de peligro
+ * @param thread_id id del hilo actual
+ * @param mutexID id del mutex utilizado
+ */
   public void leaveDangerZone(int thread_id, int[] mutexID) {
     if (mutexID[0] != -1) {
       dangerZoneLocks.get(mutexID[0]).lock();
@@ -147,6 +176,15 @@ public class tumorPOOParaleloV2 implements Runnable {
         }
     }
   }
+  /**
+ * Actualiza el estado de una célula madre
+ * Sigue la función de transición descrita en 2.5.4 del documento del TFG y el protocolo de exclusión mutua
+ * 
+ * @param thread_id id del hilo actual
+ * @param start_index indice inicial de la zona de trabajo del hilo
+ * @param end_index indice final de la zona de trabajo del hilo
+ * @param cell célula madre a procesar
+ */
   public void updateStemCells(int thread_id, int start_index, int end_index,
                               Cell cell) {
     int[] mutexID = {-1};
@@ -238,6 +276,15 @@ public class tumorPOOParaleloV2 implements Runnable {
     leaveDangerZone(thread_id, mutexID);
   }
 
+  /**
+ * Actualiza el estado de una célula no madre
+ * siguiendo la función de transición descrita en 2.5.4 del documento del TFG y el protocolo de exclusión mutua
+ *
+ * @param thread_id id del hilo actual
+ * @param start_index indice inicial de la zona de trabajo del hilo
+ * @param end_index indice final de la zona de trabajo del hilo
+ * @param cell célula madre a procesar
+ */
   public void updateNonStemCells(int thread_id, int start_index, int end_index,
                                  Cell cell) {
     int[] mutexID = {-1};
@@ -320,6 +367,14 @@ public class tumorPOOParaleloV2 implements Runnable {
     leaveDangerZone(thread_id, mutexID);
   }
 
+/**
+ * Actualiza el estado del autómata celular en el hilo actual
+ *  
+ * @param thread_id id del hilo actual
+ * @param start_index indice inicial de la zona de trabajo del hilo
+ * @param end_index indice final de la zona de trabajo del hilo
+ * 
+ */
   public void updateState(int thread_id, int start_index, int end_index) {
     List<Cell> cells = threadCells.get(thread_id);
     while (!cells.isEmpty()) {
@@ -333,6 +388,18 @@ public class tumorPOOParaleloV2 implements Runnable {
       }
     }
   }
+
+  /**
+ * Ejecuta la simulación paralela del crecimiento tumoral.
+ * Cada hilo itera durante el número total de pasos de simulación, actualizando
+ * el estado de las células en cada paso. Cuando todos los hilos terminan de procesar
+ * su parte, el hilo 0 muestra por pantalla el estado actual de la simulación y
+ * tras cada actualización cada hilo intercambia el estado actual con el
+ * temporal y limpia el contenedor temporal para el siguiente paso.
+ * @param thread_id id del hilo actual
+ * @param start_index indice inicial de la zona de trabajo del hilo
+ * @param end_index indice final de la zona de trabajo del hilo
+ */
   public void parallel_simulation(int thread_id, int start_index,
                                   int end_index) {
     for (int step = 1; step <= nSteps; step++) {
@@ -359,6 +426,10 @@ public class tumorPOOParaleloV2 implements Runnable {
       }
     }
   }
+
+  /**
+   * Ejecuta la simulación paralela en el hilo
+   */
   @Override
   public void run() {
     parallel_simulation(thread_id, start_index, end_index);
@@ -373,6 +444,11 @@ public class tumorPOOParaleloV2 implements Runnable {
     }
   }
 
+  /**
+ * Verifica que el número de células totales coincide con la suma de las células almacenadas en los vectores
+ * de trabajo de cada hilo y lo muestra por pantalla.
+ */
+
   static void verifyCellCount() {
     int totalCells = 0;
     for (List<Cell> cellList : threadCells) {
@@ -385,6 +461,28 @@ public class tumorPOOParaleloV2 implements Runnable {
       System.out.println("Cell count verified: " + totalCells);
     }
   }
+
+  /**
+ * Inicializa y ejecuta la simulación paralela del crecimiento tumoral.
+ *
+ * Configura el número de hilos a partir de los argumentos recibidos y
+ * prepara las estructuras de datos necesarias para la ejecución paralela,
+ * incluyendo las listas de células, los mecanismos de bloqueo y la barrera
+ * de sincronización.
+ *
+ * Inicializa una célula madre en el centro de la cuadrícula tridimensional
+ * y establece los contadores iniciales de células vivas. A continuación,
+ * crea y arranca los hilos de ejecución, asignando a cada uno un intervalo
+ * de coordenadas del eje X de la cuadrícula.
+ *
+ * Espera a que todos los hilos finalicen, calcula el tiempo total de
+ * ejecución, guarda los resultados de la simulación y muestra por consola
+ * las estadísticas de células vivas. Finalmente, verifica la consistencia
+ * del recuento de células.
+ *
+ * @param args Argumentos de línea de comandos. El primer argumento permite
+ *             especificar el número de hilos de ejecución.
+ */
   public static void main(String[] args) {
     if (args.length > 0) {
       N_THREADS = Integer.parseInt(args[0]);
@@ -410,12 +508,12 @@ public class tumorPOOParaleloV2 implements Runnable {
     for (int i = 0; i < N_THREADS; i++) {
       if (i == N_THREADS - 1) {
         Thread thread = new Thread(
-            new tumorPOOParaleloV2(i, i * (gridSize / N_THREADS), gridSize - 1));
+            new SimulacionTumoralParalela(i, i * (gridSize / N_THREADS), gridSize - 1));
         threads.add(thread);
         thread.start();
       } else {
         Thread thread = new Thread(
-            new tumorPOOParaleloV2(i, i * (gridSize / N_THREADS),
+            new SimulacionTumoralParalela(i, i * (gridSize / N_THREADS),
                                  (i + 1) * (gridSize / N_THREADS) - 1));
         threads.add(thread);
         thread.start();
